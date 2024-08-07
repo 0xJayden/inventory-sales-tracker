@@ -1,0 +1,21 @@
+[package]
+name = "phg"
+version = "0.1.0"
+edition = "2021"
+build = "build.rs"
+
+[build-dependencies]
+winres = "0.1"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+iced = { version = "0.12", features = ["image", "svg"] }
+iced_futures = { version = "0.12", features = ["tokio"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0.12"
+sqlx = { version = "0.7", features = ["sqlite", "runtime-tokio" ] }
+tokio = { version = "1.37.0", features = ["full"] }
+futures = "0.3"
+clipboard = "0.5.0"
+regex = "1.10.5"

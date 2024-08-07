@@ -1,0 +1,3 @@
+-- Add migration script here
+ALTER TABLE Sale ADD COLUMN shipping REAL DEFAULT 15.00 NOT NULL;
+ALTER TABLE Sale ADD COLUMN status TEXT DEFAULT "DRAFT" NOT NULL;
