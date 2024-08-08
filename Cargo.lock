@@ -2271,8 +2271,6 @@ dependencies = [
  "iced",
  "iced_futures",
  "regex",
- "serde",
- "serde_json",
  "sqlx",
  "tokio",
  "winres",

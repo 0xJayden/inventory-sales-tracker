@@ -161,8 +161,11 @@ fn svg_handle(path: &str) -> svg::Handle {
     let exe = env::current_exe().unwrap();
 
     // MacOS
-    let contents = exe.parent().unwrap().parent().unwrap().to_str().unwrap();
-    let h = svg::Handle::from_path(format!("{}/Resources/{}.svg", contents, path));
+    // let contents = exe.parent().unwrap().parent().unwrap().to_str().unwrap();
+    // let h = svg::Handle::from_path(format!("{}/Resources/{}.svg", contents, path));
+
+    let contents = exe.parent().unwrap().parent().unwrap().parent().unwrap().to_str().unwrap();
+    let h = svg::Handle::from_path(format!("{}/assets/{}.svg", contents, path));
 
     h
 }

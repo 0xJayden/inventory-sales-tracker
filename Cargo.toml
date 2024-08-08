@@ -3,6 +3,7 @@ name = "phg"
 version = "0.1.0"
 edition = "2021"
 build = "build.rs"
+authors = ["Gannix"]
 
 [build-dependencies]
 winres = "0.1"
@@ -12,8 +13,6 @@ winres = "0.1"
 [dependencies]
 iced = { version = "0.12", features = ["image", "svg"] }
 iced_futures = { version = "0.12", features = ["tokio"] }
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0.12"
 sqlx = { version = "0.7", features = ["sqlite", "runtime-tokio" ] }
 tokio = { version = "1.37.0", features = ["full"] }
 futures = "0.3"

@@ -1,13 +1,4 @@
 #![windows_subsystem = "windows"]
-#![cfg_attr(
-    all(windows, target_arch = "x86_64"),
-    link_args = "-Wl,--subsystem,windows:6.0 /ENTRY:mainCRTStartup"
-)]
-#![cfg_attr(
-    all(windows, target_arch = "x86"),
-    link_args = "-Wl,--subsystem,windows:6.0 /ENTRY:mainCRTStartup"
-)]
-
 use std::env;
 
 use error::Errorr;
@@ -827,14 +818,18 @@ impl Application for App {
 
 #[tokio::main]
 async fn main() -> iced::Result {
+    let exe = env::current_exe().unwrap();
+    let contents = exe.parent().unwrap().parent().unwrap().parent().unwrap().to_str().unwrap();
+    env::set_var("DATABASE_URL", format!("{}/db.db", contents));
     App::run(
         iced::Settings::from(
             iced::Settings {
                 window: window::Settings {
+                    icon: Some(window::icon::from_file(format!("{}/assets/icon.ico", contents)).unwrap()),
                     ..Default::default()
                 },
                 ..Default::default()
             }
-            )
         )
+    )
 }

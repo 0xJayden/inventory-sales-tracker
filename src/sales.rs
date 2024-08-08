@@ -26,7 +26,7 @@ pub struct SaleProduct {
     pub msrp_at_sale: f64
 }
 
-#[derive(Default, Clone, Debug)]
+#[derive(Clone, Default, Debug)]
 pub struct SaleProductToAdd {
     pub product_id: i64,
     pub name: String,
