@@ -3,7 +3,10 @@ use std::env;
 use iced::{alignment::Horizontal, widget::{Button, Column, Container, Row, Scrollable, Text}, Alignment, Element, Length};
 use sqlx::SqlitePool;
 
-use crate::{components::{add_button, layout, table_column, table_header, table_row_style, table_style, text_input_column, CustomButtonStyle, CustomMainButtonStyle}, error::Errorr, AppMessage};
+use crate::{
+    components::{add_button, layout, table_column, table_header, table_row_style, table_style, text_input_column, CustomButtonStyle, CustomMainButtonStyle},
+    error::Errorr, AppMessage
+};
 
 #[derive(Default, Clone, Debug)]
 pub struct Rep {
@@ -207,18 +210,28 @@ impl RepState {
                         .width(Length::Fill),
                         )
                     .push(
-                        text_input_column("Name", &self.rep_to_edit.name, |input| {
+                        text_input_column(
+                            "Name", 
+                            &self.rep_to_edit.name, 
+                            |input| {
                             AppMessage::Rep(
                                 RepMessage::NameInput(input, true),
                                 )
-                        })
+                        },
+                        Some(AppMessage::Rep(RepMessage::Submit(true)))
+                        )
                         )
                     .push(
-                        text_input_column("Percentage", &self.rep_to_edit.percentage.to_string(), |input| {
+                        text_input_column(
+                            "Percentage", 
+                            &self.rep_to_edit.percentage.to_string(), 
+                            |input| {
                             AppMessage::Rep(
                                 RepMessage::PercentageInput(input, true),
                                 )
-                        })
+                        },
+                        Some(AppMessage::Rep(RepMessage::Submit(true)))
+                        )
                         )
                     .push(
                         Row::new()
@@ -270,7 +283,8 @@ impl RepState {
                             &self.rep_to_add.name,
                             |input| { 
                                 AppMessage::Rep(RepMessage::NameInput(input, false))
-                            }
+                            },
+                            None
                             )
                         )
                     .push(
@@ -279,7 +293,9 @@ impl RepState {
                             &self.rep_to_add.percentage.to_string(),
                             |input| {
                                 AppMessage::Rep(RepMessage::PercentageInput(input, false))
-                            })
+                            },
+                            Some(AppMessage::Rep(RepMessage::Submit(false)))
+                            )
                         )
                     .push(
                         Row::new()

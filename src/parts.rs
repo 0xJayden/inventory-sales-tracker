@@ -227,11 +227,18 @@ impl PartsState {
                         .width(Length::Fill),
                         )
                     .push(
-                        text_input_column("Name", &self.part_to_add.name, |input| {
+                        text_input_column(
+                            "Name", 
+                            &self.part_to_add.name, 
+                            |input| {
                             AppMessage::Parts(
                                 PartsMessage::NameInput(input, false),
                                 )
-                        })
+                            },
+                            Some(AppMessage::Parts(
+                                PartsMessage::Submit(false)
+                                ))
+                        )
                         )
                     .push(
                         Button::new(
@@ -265,11 +272,18 @@ impl PartsState {
                         .width(Length::Fill),
                         )
                     .push(
-                        text_input_column("Name", &self.part_to_edit.name, |input| {
+                        text_input_column(
+                            "Name", 
+                            &self.part_to_edit.name, 
+                            |input| {
                             AppMessage::Parts(
                                 PartsMessage::NameInput(input, true),
                                 )
-                        })
+                            },
+                            Some(AppMessage::Parts(
+                                PartsMessage::Submit(true)
+                                ))
+                        )
                         )
                     .push(
                         Row::new()

@@ -50,15 +50,26 @@ pub fn bold_text(s: &str) -> Text {
             })
 }
 
-pub fn text_input_column<'a, F>(label: &'static str, value: &'a str, on_input: F) -> Column<'static, AppMessage> 
+pub fn text_input_column<'a, F>(
+    label: &'static str, 
+    value: &'a str, 
+    on_input: F,
+    on_submit: Option<AppMessage>
+    ) -> Column<'static, AppMessage> 
 where F: 'static + Fn(String) -> AppMessage
 {
     Column::new()
         .spacing(4)
         .push(bold_text(label))
         .push(
-            TextInput::new(label, value)
-            .on_input(on_input),
+            if let Some(msg) = on_submit {
+                TextInput::new(label, value)
+            .on_input(on_input)
+            .on_submit(msg)
+            } else {
+                TextInput::new(label,value)
+                    .on_input(on_input)
+            }
             )
 }
 
@@ -312,20 +323,6 @@ pub fn table_column(str: &str) -> Column<'static, AppMessage> {
         .push(Text::new(str.to_string()))
         .width(150)
         .align_items(Alignment::Center)
-}
-
-pub fn edit_column<F>(label: &str, input: &str, msg: F) -> Column<'static, AppMessage>
-where
-    F: 'static + Fn(String) -> AppMessage
-{
-    Column::new()
-        .push(Text::new(label.to_string())
-          .horizontal_alignment(Horizontal::Left)
-          .width(Length::Fill))
-        .push(Row::new()
-              .push(TextInput::new(label, input)
-                    .on_input(msg))
-              .padding([0,0,12,0]))
 }
 
 fn table_label(str: &str) -> Container<'static, AppMessage> {

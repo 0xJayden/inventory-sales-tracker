@@ -3,14 +3,22 @@ use clipboard::{ClipboardContext, ClipboardProvider};
 
 use iced::{
     alignment::Horizontal,
-    widget::{scrollable::{Direction, Properties}, Button, Column, Container, Row, Scrollable, Text, TextInput},
+    widget::{
+        scrollable::{Direction, Properties}, 
+        Button, Column, Container, Row, Scrollable, Text, TextInput
+    },
     Alignment, Element, Length, 
 };
 
 use sqlx::SqlitePool;
 
 use crate::{
-    clients::{get_client, get_clients, Client}, components::{add_button, bold_text, card_style, close_button, edit_column, layout, table_column, table_header, table_row_style, table_style, text_input_column, CustomButtonStyle, CustomMainButtonStyle}, manufacture::select_header, product::{get_products, Product}, rep::{get_reps, Rep}, AppMessage
+    clients::{get_client, get_clients, Client}, 
+    components::{add_button, bold_text, card_style, close_button, layout, table_column, table_header, table_row_style, table_style, text_input_column, CustomButtonStyle, CustomMainButtonStyle}, 
+    manufacture::select_header, 
+    product::{get_products, Product}, 
+    rep::{get_reps, Rep},
+    AppMessage
 };
 
 use crate::error::Errorr;
@@ -939,9 +947,28 @@ impl SalesState {
                               .size(24)
                               .horizontal_alignment(Horizontal::Center)
                               .width(Length::Fill))
-                        .push(edit_column("Discount", &self.sale_to_edit.discount.unwrap_or(0.00).to_string(), |input| AppMessage::Sale(SaleMessage::DiscountInput(input, true))))
-                        .push(edit_column("Date", &self.sale_to_edit.date, |input| AppMessage::Sale(SaleMessage::DateInput(input, true))))
-                        .push(edit_column("Note", &self.sale_to_edit.note.clone().unwrap_or("".to_string()), |input| AppMessage::Sale(SaleMessage::NoteInput(input, true))))
+                        .push(
+                            text_input_column(
+                                "Discount",
+                                &self.sale_to_edit.discount.unwrap_or(0.00).to_string(),
+                                |input| AppMessage::Sale(SaleMessage::DiscountInput(input, true)),
+                                None
+                                )
+                            )
+                        .push(text_input_column(
+                                "Date",
+                                &self.sale_to_edit.date,
+                                |input| AppMessage::Sale(SaleMessage::DateInput(input, true)),
+                                None
+                                )
+                            )
+                        .push(
+                            text_input_column(
+                                "Note",
+                                &self.sale_to_edit.note.clone().unwrap_or("".to_string()),
+                                |input| AppMessage::Sale(SaleMessage::NoteInput(input, true)),
+                                None
+                                ))
                         .push(Row::new()
                               .push(Button::new(Text::new("Submit".to_string())
                                                 .horizontal_alignment(Horizontal::Center))
@@ -982,13 +1009,16 @@ impl SalesState {
                             text_input_column(
                                 "Discount", 
                                 &self.add_sales.discount.unwrap_or(0.00).to_string(),
-                                |input| AppMessage::Sale(SaleMessage::DiscountInput(input, false)))
+                                |input| AppMessage::Sale(SaleMessage::DiscountInput(input, false)),
+                                None
+                                )
                             )
                         .push(
                             text_input_column(
                                 "Date",
                                 &self.add_sales.date,
-                                |input| AppMessage::Sale(SaleMessage::DateInput(input, false))
+                                |input| AppMessage::Sale(SaleMessage::DateInput(input, false)),
+                                None
                                 )
                             )
                         .push(Column::new()
@@ -1028,7 +1058,9 @@ impl SalesState {
                             text_input_column(
                                 "Notes",
                                 &self.add_sales.note.clone().unwrap_or("".to_string()),
-                                |input| AppMessage::Sale(SaleMessage::NoteInput(input, false)))
+                                |input| AppMessage::Sale(SaleMessage::NoteInput(input, false)),
+                                None
+                                )
                             )
                         .push(Button::new("Submit")
                               .on_press(AppMessage::Sale(SaleMessage::Submit(false)))
@@ -1044,8 +1076,21 @@ impl SalesState {
             Some(Container::new(
                     Scrollable::new(
                     Column::new()
-                    .push(edit_column("Name", &self.rep_to_create.name, |input| AppMessage::Sale(SaleMessage::RepName(input))))
-                    .push(edit_column("Percentage", &self.rep_to_create.percentage.to_string(), |input| AppMessage::Sale(SaleMessage::RepPercentage(input))))
+                    .push(
+                        text_input_column(
+                            "Name",
+                            &self.rep_to_create.name,
+                            |input| AppMessage::Sale(SaleMessage::RepName(input)),
+                            None
+                            ))
+                    .push(
+                        text_input_column(
+                            "Percentage",
+                            &self.rep_to_create.percentage.to_string(),
+                            |input| AppMessage::Sale(SaleMessage::RepPercentage(input)),
+                            Some(AppMessage::Sale(SaleMessage::CreateRepSubmit))
+                            )
+                        )
                     .push(Button::new("Submit")
                           .on_press(AppMessage::Sale(SaleMessage::CreateRepSubmit))
                           .style(CustomMainButtonStyle)))).into())
@@ -1059,9 +1104,28 @@ impl SalesState {
             Some(Container::new(
                     Scrollable::new(
                     Column::new()
-                    .push(edit_column("Name", &self.client_to_create.name, |input| AppMessage::Sale(SaleMessage::ClientName(input))))
-                    .push(edit_column("Address", &self.client_to_create.address, |input| AppMessage::Sale(SaleMessage::ClientAddress(input))))
-                    .push(edit_column("Email", &self.client_to_create.email.clone().unwrap_or("".to_string()), |input| AppMessage::Sale(SaleMessage::ClientEmail(input))))
+                    .push(
+                        text_input_column(
+                            "Name",
+                            &self.client_to_create.name,
+                            |input| AppMessage::Sale(SaleMessage::ClientName(input)),
+                            None
+                            )
+                        )
+                    .push(
+                        text_input_column(
+                            "Address", 
+                            &self.client_to_create.address,
+                            |input| AppMessage::Sale(SaleMessage::ClientAddress(input)),
+                            None))
+                    .push(
+                        text_input_column(
+                            "Email",
+                            &self.client_to_create.email.clone().unwrap_or("".to_string()),
+                            |input| AppMessage::Sale(SaleMessage::ClientEmail(input)),
+                            Some(AppMessage::Sale(SaleMessage::CreateClientSubmit))
+                            )
+                        )
                     .push(Button::new("Submit")
                           .on_press(AppMessage::Sale(SaleMessage::CreateClientSubmit))
                           .style(CustomMainButtonStyle)

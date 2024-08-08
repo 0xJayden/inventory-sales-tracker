@@ -8,7 +8,12 @@ use iced::{
 use sqlx::SqlitePool;
 
 use crate::{
-    components::{add_button, bold_text, card_style, close_button, edit_column, layout, table_column, table_header, table_row_qty_style, table_row_style, table_style, text_input_column, CustomButtonStyle, CustomMainButtonStyle}, error::Errorr, manufacture::select_header, parts::Part, purchase::{parse_input, validate_input, PartToSelect}, AppMessage
+    components::{add_button, bold_text, card_style, close_button, layout, table_column, table_header, table_row_qty_style, table_row_style, table_style, text_input_column, CustomButtonStyle, CustomMainButtonStyle},
+    error::Errorr,
+    manufacture::select_header,
+    parts::Part,
+    purchase::{parse_input, validate_input, PartToSelect},
+    AppMessage
 };
 
 #[derive(Debug, Default, Clone)]
@@ -516,19 +521,29 @@ impl ProductState {
                         .width(Length::Fill),
                         )
                     .push(
-                        text_input_column("Name", &self.product_to_add.name, |input| {
+                        text_input_column(
+                            "Name",
+                            &self.product_to_add.name,
+                            |input| {
                             AppMessage::Product(
                                 ProductMessage::NameInput(input, false),
                                 )
-                        })
+                        },
+                        None
+                        )
                         )
                     .push(
-                        text_input_column("MSRP", parse_input(&self.product_to_add.msrp), |input| {
+                        text_input_column(
+                            "MSRP",
+                            parse_input(&self.product_to_add.msrp),
+                            |input| {
                             AppMessage::Product(ProductMessage::MsrpInput(
                                     input,
                                     false
                                     ))
-                        })
+                        },
+                        None
+                        )
                         )
                     .push(
                         Column::new()
@@ -563,6 +578,7 @@ impl ProductState {
                         .align_items(Alignment::Center)
                         .push(
                             Column::new()
+                            .spacing(8)
                                 .max_width(700)
                                 .push(
                                     Text::new("Edit Product".to_string())
@@ -571,43 +587,28 @@ impl ProductState {
                                         .width(Length::Fill),
                                 )
                                 .push(
-                                    Text::new("Name".to_string())
-                                        .horizontal_alignment(Horizontal::Left)
-                                        .width(Length::Fill),
-                                )
-                                .push(
-                                    Row::new()
-                                        .push(
-                                            TextInput::new("Name", &self.product_to_edit.name)
-                                                .on_input(|input| {
-                                                    AppMessage::Product(
-                                                        ProductMessage::NameInput(input, true),
-                                                    )
-                                                }),
+                                    text_input_column(
+                                        "Name", 
+                                        &self.product_to_edit.name, 
+                                        |input| {
+                                            AppMessage::Product(
+                                                ProductMessage::NameInput(input, true),
+                                                )
+                                        },
+                                        Some(AppMessage::Product(ProductMessage::Submit(true)))
                                         )
-                                        .padding([0, 0, 12, 0]),
-                                )
+                                    )
                                 .push(
-                                    Text::new("MSRP".to_string())
-                                        .horizontal_alignment(Horizontal::Left)
-                                        .width(Length::Fill),
-                                )
-                                .push(
-                                    Row::new()
-                                        .push(
-                                            TextInput::new(
-                                                "MSRP",
-                                                &format!("{:.2}", self.product_to_edit.msrp),
-                                            )
-                                            .on_input(
-                                                |input| {
-                                                    AppMessage::Product(
-                                                        ProductMessage::MsrpInput(input, true),
-                                                    )
-                                                },
-                                            ),
+                                    text_input_column(
+                                        "MSRP", 
+                                        &format!("{:.2}", self.product_to_edit.msrp),
+                                        |input| {
+                                            AppMessage::Product(
+                                                ProductMessage::MsrpInput(input, true),
+                                                )
+                                        },
+                                        Some(AppMessage::Product(ProductMessage::Submit(true)))
                                         )
-                                        .padding([0, 0, 12, 0]),
                                 )
                                 .push(
                                     Row::new()
@@ -646,9 +647,16 @@ impl ProductState {
             Some(
                 Container::new(Scrollable::new(
                     Column::new()
-                        .push(edit_column("Name", &self.part_to_create.name, |input| {
+                        .push(
+                            text_input_column(
+                                "Name",
+                                &self.part_to_create.name,
+                                |input| {
                             AppMessage::Product(ProductMessage::PartName(input))
-                        }))
+                        },
+                        Some(AppMessage::Product(ProductMessage::CreatePartSubmit))
+                        )
+                            )
                         .push(
                             Button::new("Submit")
                                 .on_press(AppMessage::Product(ProductMessage::CreatePartSubmit))

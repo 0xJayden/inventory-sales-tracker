@@ -8,7 +8,9 @@ use iced::{
 use sqlx::SqlitePool;
 
 use crate::{
-    components::{add_button, bold_text, close_button, layout, table_column, table_header, table_row_style, table_style, text_input_column, CustomButtonStyle, CustomMainButtonStyle}, error::Errorr, product::Product, AppMessage, 
+    components::{add_button, bold_text, close_button, layout, table_column, table_header, table_row_style, table_style, text_input_column, CustomButtonStyle, CustomMainButtonStyle}, 
+    error::Errorr, 
+    product::Product, AppMessage, 
 };
 
 #[derive(Default, Clone, Debug)]
@@ -434,47 +436,52 @@ impl ManufactureState {
         if self.add_manufacture {
             Some(
                 Column::new()
-                    .max_width(1000)
-                    .push(
-                        Container::new(
+                .max_width(1000)
+                .push(
+                    Container::new(
+                        Column::new()
+                        .spacing(12)
+                        .push(
+                            Text::new("Add Manufacture".to_string())
+                            .size(24)
+                            .horizontal_alignment(Horizontal::Center)
+                            .width(Length::Fill),
+                            )
+                        .push(
+                            text_input_column(
+                                "Date",
+                                &self.manufacture_to_add.date,
+                                |input| {
+                                    AppMessage::Manufacture(
+                                        ManufactureMessage::DateInput(input, false),
+                                        )
+                                },
+                                None
+                                )
+                            )
+                        .push(
                             Column::new()
-                            .spacing(12)
-                                .push(
-                                    Text::new("Add Manufacture".to_string())
-                                        .size(24)
-                                        .horizontal_alignment(Horizontal::Center)
-                                        .width(Length::Fill),
+                            .width(Length::Fill)
+                            .align_items(Alignment::Center)
+                            .push(
+                                Row::new()
+                                .spacing(12)
+                                .push(self.select_product())
+                                .push(self.selected_products()),
+                                ),
                                 )
-                                .push(
-                                    text_input_column("Date", &self.manufacture_to_add.date, |input| {
-                                                    AppMessage::Manufacture(
-                                                        ManufactureMessage::DateInput(input, false),
-                                                    )
-                                                })
-                                    )
-                                .push(
-                                    Column::new()
-                                    .width(Length::Fill)
-                                    .align_items(Alignment::Center)
-                                    .push(
-                                        Row::new()
-                                        .spacing(12)
-                                        .push(self.select_product())
-                                        .push(self.selected_products()),
-                                        ),
-                                )
-                                .push(
-                                    Button::new("Submit")
-                                      .on_press(AppMessage::Manufacture(
+                        .push(
+                            Button::new("Submit")
+                            .on_press(AppMessage::Manufacture(
                                     ManufactureMessage::Submit(false),
-                                ))
-                                      .style(CustomMainButtonStyle)
-                                      ),
-                        )
-                        .padding(24),
-                    )
-                    .into(),
-            )
+                                    ))
+                            .style(CustomMainButtonStyle)
+                            ),
+                            )
+                                .padding(24),
+                                )
+                                    .into(),
+                                    )
         } else {
             None
         }
@@ -497,21 +504,16 @@ impl ManufactureState {
                                         .width(Length::Fill),
                                 )
                                 .push(
-                                    Text::new("Date".to_string())
-                                        .horizontal_alignment(Horizontal::Left)
-                                        .width(Length::Fill),
-                                )
-                                .push(
-                                    Row::new()
-                                        .push(
-                                            TextInput::new("Date", &self.manufacture_to_edit.date)
-                                                .on_input(|input| {
-                                                    AppMessage::Manufacture(
-                                                        ManufactureMessage::DateInput(input, true),
-                                                    )
-                                                }),
+                                    text_input_column(
+                                        "Date", 
+                                        &self.manufacture_to_edit.date, 
+                                        |input| {
+                                            AppMessage::Manufacture(
+                                                ManufactureMessage::DateInput(input, true),
+                                                )
+                                        },
+                                        Some(AppMessage::Manufacture(ManufactureMessage::Submit(true)))
                                         )
-                                        .padding([0, 0, 12, 0]),
                                 )
                                 .push(
                                     Row::new()
