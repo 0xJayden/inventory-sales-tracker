@@ -1,16 +1,27 @@
-use std::env;
 use clipboard::{ClipboardContext, ClipboardProvider};
+use std::env;
 
 use iced::{
     alignment::Horizontal,
-    widget::{scrollable::{Direction, Properties}, Button, Column, Container, Row, Scrollable, Text, TextInput},
-    Alignment, Element, Length, 
+    widget::{
+        scrollable::{Direction, Properties},
+        Button, Column, Container, Row, Scrollable, Text, TextInput,
+    },
+    Alignment, Element, Length,
 };
 
 use sqlx::SqlitePool;
 
 use crate::{
-    clients::{get_client, get_clients, Client}, components::{add_button, bold_text, card_style, close_button, edit_column, layout, table_column, table_header, table_row_style, table_style, text_input_column, CustomButtonStyle, CustomMainButtonStyle}, manufacture::select_header, product::{get_products, Product}, rep::{get_reps, Rep}, AppMessage
+    clients::{get_client, get_clients, Client},
+    components::{
+        add_button, bold_text, card_style, close_button, layout, table_column, table_header,
+        table_row_style, table_style, text_input_column, CustomButtonStyle, CustomMainButtonStyle,
+    },
+    manufacture::select_header,
+    product::{get_products, Product},
+    rep::{get_reps, Rep},
+    AppMessage,
 };
 
 use crate::error::Errorr;
@@ -23,22 +34,22 @@ pub struct SaleProduct {
     pub msrp: f64,
     pub cost: f64,
     pub cost_at_sale: f64,
-    pub msrp_at_sale: f64
+    pub msrp_at_sale: f64,
 }
 
-#[derive(Default, Clone, Debug)]
+#[derive(Clone, Default, Debug)]
 pub struct SaleProductToAdd {
     pub product_id: i64,
     pub name: String,
     pub qty: i64,
     pub msrp: f64,
     pub cost: f64,
-    pub units: i64
+    pub units: i64,
 }
 
 #[derive(Debug, Clone, Default)]
 pub struct Sale {
-    pub sale_id: i64, 
+    pub sale_id: i64,
     pub discount: Option<f64>,
     pub total: f64,
     pub cost: f64,
@@ -52,7 +63,7 @@ pub struct Sale {
     pub rep_percentage: u8,
     pub rep_cut: Option<f64>,
     pub status: String,
-    pub shipping: f64
+    pub shipping: f64,
 }
 
 #[derive(Default, Clone)]
@@ -80,7 +91,7 @@ pub struct SalesState {
     pub filtered_clients: Vec<Client>,
     client_query: String,
     pub filtered_reps: Vec<Rep>,
-    rep_query: String
+    rep_query: String,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -111,7 +122,7 @@ pub enum SaleMessage {
     RepQuery(String),
     CopyClientInfo,
     Fulfill,
-    CloseSale
+    CloseSale,
 }
 
 pub async fn get_sales() -> Result<Vec<Sale>, Errorr> {
@@ -135,7 +146,7 @@ pub async fn get_sales() -> Result<Vec<Sale>, Errorr> {
 #[derive(Clone, Debug)]
 pub struct SC {
     pub sale_products: Vec<SaleProduct>,
-    pub client: Client
+    pub client: Client,
 }
 
 pub async fn get_sale_products_and_client(sale_id: i64, client_id: i64) -> Result<SC, Errorr> {
@@ -157,7 +168,7 @@ pub async fn get_sale_products_and_client(sale_id: i64, client_id: i64) -> Resul
 
     let r = SC {
         sale_products,
-        client
+        client,
     };
 
     Ok(r)
@@ -167,12 +178,12 @@ pub async fn get_sale_products_and_client(sale_id: i64, client_id: i64) -> Resul
 pub struct PCR {
     pub products: Vec<Product>,
     pub clients: Vec<Client>,
-    pub reps: Vec<Rep>
+    pub reps: Vec<Rep>,
 }
 
 pub async fn get_products_and_clients() -> Result<PCR, Errorr> {
     let products = get_products().await?;
-    
+
     let clients = get_clients().await?;
 
     let reps = get_reps().await?;
@@ -180,7 +191,7 @@ pub async fn get_products_and_clients() -> Result<PCR, Errorr> {
     let r = PCR {
         products,
         clients,
-        reps
+        reps,
     };
 
     Ok(r)
@@ -201,9 +212,9 @@ pub async fn add_client_set(client: Client) -> Result<i64, Errorr> {
         name,
         address,
         email,
-        )
-        .execute(&pool)
-        .await?;
+    )
+    .execute(&pool)
+    .await?;
 
     Ok(c.last_insert_rowid())
 }
@@ -211,7 +222,7 @@ pub async fn add_client_set(client: Client) -> Result<i64, Errorr> {
 #[derive(Clone, Debug)]
 pub struct R {
     pub id: i64,
-    pub name: String
+    pub name: String,
 }
 
 pub async fn add_rep_set(rep: Rep) -> Result<R, Errorr> {
@@ -227,13 +238,13 @@ pub async fn add_rep_set(rep: Rep) -> Result<R, Errorr> {
         ",
         name,
         percentage
-        )
-        .execute(&pool)
-        .await?;
+    )
+    .execute(&pool)
+    .await?;
 
     let r = R {
         id: c.last_insert_rowid(),
-        name
+        name,
     };
 
     Ok(r)
@@ -242,36 +253,34 @@ pub async fn add_rep_set(rep: Rep) -> Result<R, Errorr> {
 fn item_view_row(label: &str, value: String) -> Row<'static, AppMessage> {
     Row::new()
         .padding(4)
-        .push(Row::new()
-              .push(Text::new(label.to_string()))
-              .width(100))
-        .push(Column::new()
-              .push(Text::new(value))
-              .align_items(Alignment::End)
-              .width(100))
+        .push(Row::new().push(Text::new(label.to_string())).width(100))
+        .push(
+            Column::new()
+                .push(Text::new(value))
+                .align_items(Alignment::End)
+                .width(100),
+        )
 }
 
 fn item_view(item: &SaleProduct) -> Container<'static, AppMessage> {
     let total = item.msrp * item.qty as f64;
     let net = total - item.cost * item.qty as f64;
-    
+
     Container::new(
         Column::new()
-        .push(Text::new(item.name.to_string())
-              .size(20))
-        .push(item_view_row("Quantity: ", item.qty.to_string()))
-        .push(item_view_row("Cost: ", format!("${:.2}", item.cost)))
-        .push(item_view_row("MSRP: ", format!("${:.2}", item.msrp)))
-        .push(item_view_row("Net: ", format!("${:.2}", net)))
-        .push(item_view_row("Total: ", format!("${:.2}", total))))
-        .padding(8)
-        .style(card_style())
+            .push(Text::new(item.name.to_string()).size(20))
+            .push(item_view_row("Quantity: ", item.qty.to_string()))
+            .push(item_view_row("Cost: ", format!("${:.2}", item.cost)))
+            .push(item_view_row("MSRP: ", format!("${:.2}", item.msrp)))
+            .push(item_view_row("Net: ", format!("${:.2}", net)))
+            .push(item_view_row("Total: ", format!("${:.2}", total))),
+    )
+    .padding(8)
+    .style(card_style())
 }
 
 fn client_view_row(value: String) -> Row<'static, AppMessage> {
-    Row::new()
-        .padding(4)
-        .push(Text::new(value))
+    Row::new().padding(4).push(Text::new(value))
 }
 
 fn client_view(client: &Client) -> Container<'static, AppMessage> {
@@ -280,19 +289,23 @@ fn client_view(client: &Client) -> Container<'static, AppMessage> {
             .push(Text::new("Client"))
             .push(client_view_row(client.name.clone()))
             .push(client_view_row(client.address.clone()))
-            .push(client_view_row(client.email.clone().unwrap_or("".to_string())))
-            .push(Button::new("Copy Client Info")
-                  .on_press(AppMessage::Sale(SaleMessage::CopyClientInfo))
-                  .style(CustomMainButtonStyle))
-        )
+            .push(client_view_row(
+                client.email.clone().unwrap_or("".to_string()),
+            ))
+            .push(
+                Button::new("Copy Client Info")
+                    .on_press(AppMessage::Sale(SaleMessage::CopyClientInfo))
+                    .style(CustomMainButtonStyle),
+            ),
+    )
 }
 
-impl SalesState { 
+impl SalesState {
     pub async fn edit_sale(sale: Sale) -> Result<(), Errorr> {
         let pool = SqlitePool::connect(&env::var("DATABASE_URL")?).await?;
 
         let id = sale.sale_id;
-        let discount  = sale.discount.unwrap_or(0.00);
+        let discount = sale.discount.unwrap_or(0.00);
         let date = sale.date;
         let client = sale.client_id;
         let note = sale.note;
@@ -308,9 +321,9 @@ impl SalesState {
             client,
             note,
             id
-            )
-            .execute(&pool)
-            .await?;
+        )
+        .execute(&pool)
+        .await?;
 
         Ok(())
     }
@@ -326,9 +339,9 @@ impl SalesState {
             ",
             "COMPLETED",
             id
-            )
-            .execute(&pool)
-            .await?;
+        )
+        .execute(&pool)
+        .await?;
 
         Ok(())
     }
@@ -344,14 +357,18 @@ impl SalesState {
             WHERE sale_id = ?
             ",
             id
-            )
-            .execute(&pool)
-            .await?;
+        )
+        .execute(&pool)
+        .await?;
 
         Ok(())
     }
 
-    pub async fn add_sales(i: Vec<SaleProductToAdd>, j: Vec<SaleProductToAdd>, sales: Sale) -> Result<(), Errorr> {
+    pub async fn add_sales(
+        i: Vec<SaleProductToAdd>,
+        j: Vec<SaleProductToAdd>,
+        sales: Sale,
+    ) -> Result<(), Errorr> {
         let pool = SqlitePool::connect(&env::var("DATABASE_URL")?).await?;
         let discount = sales.discount;
         let total = sales.total;
@@ -396,51 +413,65 @@ impl SalesState {
                 item.product_id,
                 item.cost,
                 item.msrp
-                )
-                .execute(&pool)
-                .await?;
+            )
+            .execute(&pool)
+            .await?;
 
-            let units = i.iter().find(|i| i.product_id == item.product_id).unwrap().units - item.qty;
+            let units = i
+                .iter()
+                .find(|i| i.product_id == item.product_id)
+                .unwrap()
+                .units
+                - item.qty;
 
             sqlx::query!(
-                    "
+                "
                     UPDATE Product
                     SET units = ?
                     WHERE product_id = ?
                     ",
-                    units,
-                    item.product_id
-                )
-                .execute(&pool)
-                .await?;
-        };
+                units,
+                item.product_id
+            )
+            .execute(&pool)
+            .await?;
+        }
 
         Ok(())
     }
-    
+
     pub fn update(&mut self, message: SaleMessage) {
-       match message {
+        match message {
             SaleMessage::ProductQtyChanged(qty, id, cost, msrp) => {
-                if let Some(i) = self.filtered_products.iter_mut().find(|item| item.product_id == id) {
+                if let Some(i) = self
+                    .filtered_products
+                    .iter_mut()
+                    .find(|item| item.product_id == id)
+                {
                     i.qty = qty.parse::<i64>().unwrap_or(0);
                     i.cost = cost;
                     i.msrp = msrp;
 
-                    match self.products_to_add.iter_mut().find(|item| item.product_id == id) {
+                    match self
+                        .products_to_add
+                        .iter_mut()
+                        .find(|item| item.product_id == id)
+                    {
                         Some(p) => {
                             p.qty = i.qty;
                             if p.qty == 0 {
-                                let f_products = self.products_to_add.iter().filter_map(|product| match product.product_id != id {
-                                    true => Some(product.to_owned()),
-                                    false => None
-                                });
-                
+                                let f_products =
+                                    self.products_to_add.iter().filter_map(|product| {
+                                        match product.product_id != id {
+                                            true => Some(product.to_owned()),
+                                            false => None,
+                                        }
+                                    });
+
                                 self.products_to_add = f_products.collect();
                             }
                         }
-                        None => {
-                            self.products_to_add.push(i.clone())
-                        }
+                        None => self.products_to_add.push(i.clone()),
                     }
                 }
             }
@@ -494,7 +525,7 @@ impl SalesState {
             SaleMessage::AddRep(cid, cname, p) => {
                 self.add_sales.rep_id = Some(cid);
                 self.add_sales.rep_name = cname;
-                self.add_sales.rep_percentage = p; 
+                self.add_sales.rep_percentage = p;
             }
             SaleMessage::CreateRep => {
                 if self.create_rep {
@@ -511,7 +542,7 @@ impl SalesState {
                 self.rep_to_create.name = s;
             }
             SaleMessage::RepPercentage(p) => {
-                self.rep_to_create.percentage = p.parse::<u8>().unwrap_or(0); 
+                self.rep_to_create.percentage = p.parse::<u8>().unwrap_or(0);
             }
             SaleMessage::NoteInput(n, is_edit) => {
                 if is_edit {
@@ -556,7 +587,8 @@ impl SalesState {
                     }
 
                     if let Some(_) = self.add_sales.rep_id {
-                        let rep_cut = self.add_sales.total * (self.add_sales.rep_percentage as f64 / 100.00);
+                        let rep_cut =
+                            self.add_sales.total * (self.add_sales.rep_percentage as f64 / 100.00);
                         let new_net = self.add_sales.net - rep_cut;
                         self.add_sales.net = new_net;
                         self.add_sales.rep_cut = Some(rep_cut);
@@ -571,12 +603,17 @@ impl SalesState {
             }
             SaleMessage::Query(q) => {
                 if q.len() > 0 {
-                    self.filtered_products = self.products_to_select.iter().filter_map(|product| if product.name.contains(&q) {
-                        Some(product.to_owned())
-                    } else {
-                        None
-                    }
-                    ).collect();
+                    self.filtered_products = self
+                        .products_to_select
+                        .iter()
+                        .filter_map(|product| {
+                            if product.name.contains(&q) {
+                                Some(product.to_owned())
+                            } else {
+                                None
+                            }
+                        })
+                        .collect();
                 } else {
                     self.filtered_products = self.products_to_select.clone()
                 }
@@ -584,12 +621,17 @@ impl SalesState {
             }
             SaleMessage::ClientQuery(q) => {
                 if q.len() > 0 {
-                    self.filtered_clients = self.clients.iter().filter_map(|client| if client.name.contains(&q) {
-                        Some(client.to_owned())
-                    } else {
-                        None
-                    }
-                    ).collect();
+                    self.filtered_clients = self
+                        .clients
+                        .iter()
+                        .filter_map(|client| {
+                            if client.name.contains(&q) {
+                                Some(client.to_owned())
+                            } else {
+                                None
+                            }
+                        })
+                        .collect();
                 } else {
                     self.filtered_clients = self.clients.clone()
                 }
@@ -597,34 +639,39 @@ impl SalesState {
             }
             SaleMessage::RepQuery(q) => {
                 if q.len() > 0 {
-                    self.filtered_reps = self.reps.iter().filter_map(|rep| if rep.name.contains(&q) {
-                        Some(rep.to_owned())
-                    } else {
-                        None
-                    }
-                    ).collect();
+                    self.filtered_reps = self
+                        .reps
+                        .iter()
+                        .filter_map(|rep| {
+                            if rep.name.contains(&q) {
+                                Some(rep.to_owned())
+                            } else {
+                                None
+                            }
+                        })
+                        .collect();
                 } else {
                     self.filtered_reps = self.reps.clone()
                 }
                 self.rep_query = q;
             }
             SaleMessage::RemoveProduct(id) => {
-                let f_products =
-                    self.products_to_add
-                        .iter()
-                        .filter_map(|product| 
-                                    if product.product_id != id {
-                                        Some(product.to_owned())
-                                    } else {
-                                        None
-                                    }
-                        );
+                let f_products = self.products_to_add.iter().filter_map(|product| {
+                    if product.product_id != id {
+                        Some(product.to_owned())
+                    } else {
+                        None
+                    }
+                });
 
                 self.products_to_add = f_products.collect();
             }
             SaleMessage::CopyClientInfo => {
                 let mut ctx: ClipboardContext = ClipboardProvider::new().unwrap();
-                let contents = format!("{} {}", self.client_to_view.name, self.client_to_view.address);
+                let contents = format!(
+                    "{} {}",
+                    self.client_to_view.name, self.client_to_view.address
+                );
                 ctx.set_contents(contents).unwrap();
             }
             SaleMessage::Fulfill => {
@@ -635,330 +682,396 @@ impl SalesState {
             }
         }
     }
-    
+
     fn select_rep(&self) -> Container<'_, AppMessage> {
         Container::new(
             Column::new()
-            .spacing(8)
-            .push(
-                Row::new()
-                .push(bold_text("Select Rep"))
+                .spacing(8)
                 .push(
-                    Column::new()
-                    .width(Length::Fill)
-                    .align_items(Alignment::End)
-                    .push(
-                    Button::new("New Rep")
-                      .on_press(AppMessage::Sale(SaleMessage::CreateRep))
-                      .style(CustomMainButtonStyle)
-                      )
-                    )
+                    Row::new().push(bold_text("Select Rep")).push(
+                        Column::new()
+                            .width(Length::Fill)
+                            .align_items(Alignment::End)
+                            .push(
+                                Button::new("New Rep")
+                                    .on_press(AppMessage::Sale(SaleMessage::CreateRep))
+                                    .style(CustomMainButtonStyle),
+                            ),
+                    ),
                 )
                 .push(
                     TextInput::new("Search", &self.rep_query)
-                    .on_input(|input| AppMessage::Sale(SaleMessage::RepQuery(input)))
-                    )
-            .push(
-                Container::new(
-                    Column::new()
-                    .width(Length::Fill)
-                    .push_maybe(self.create_rep_view())
-                    .push(
-                        Scrollable::new(
-                            Column::new()
-                            .padding(12)
-                            .extend(self.filtered_reps.iter().map(
-                                    |rep|
-                                        Column::new()
+                        .on_input(|input| AppMessage::Sale(SaleMessage::RepQuery(input))),
+                )
+                .push(
+                    Container::new(
+                        Column::new()
+                            .width(Length::Fill)
+                            .push_maybe(self.create_rep_view())
+                            .push(Scrollable::new(Column::new().padding(12).extend(
+                                self.filtered_reps.iter().map(|rep| {
+                                    Column::new()
                                         .push(
                                             Button::new(table_column(&rep.name))
-                                            .width(Length::Fill)
-                                            .style(CustomButtonStyle)
-                                          .on_press(AppMessage::Sale(SaleMessage::AddRep(rep.id, rep.name.clone(), rep.percentage))))
-                                    .into()
-                                    )))
-                    ))
+                                                .width(Length::Fill)
+                                                .style(CustomButtonStyle)
+                                                .on_press(AppMessage::Sale(SaleMessage::AddRep(
+                                                    rep.id,
+                                                    rep.name.clone(),
+                                                    rep.percentage,
+                                                ))),
+                                        )
+                                        .into()
+                                }),
+                            ))),
+                    )
                     .max_height(200)
-                    .style(card_style())))
+                    .style(card_style()),
+                ),
+        )
     }
-    
+
     fn select_client(&self) -> Container<'_, AppMessage> {
         Container::new(
             Column::new()
-            .spacing(8)
-            .push(
-                Row::new()
-                .push(bold_text("Select Client"))
+                .spacing(8)
                 .push(
-                    Column::new()
-                    .width(Length::Fill)
-                    .align_items(Alignment::End)
-                    .push(
-                    Button::new("New Client")
-                      .on_press(AppMessage::Sale(SaleMessage::CreateClient))
-                      .style(CustomMainButtonStyle)
-                      )
-                    )
+                    Row::new().push(bold_text("Select Client")).push(
+                        Column::new()
+                            .width(Length::Fill)
+                            .align_items(Alignment::End)
+                            .push(
+                                Button::new("New Client")
+                                    .on_press(AppMessage::Sale(SaleMessage::CreateClient))
+                                    .style(CustomMainButtonStyle),
+                            ),
+                    ),
                 )
                 .push(
                     TextInput::new("Search", &self.client_query)
-                    .on_input(|input| AppMessage::Sale(SaleMessage::ClientQuery(input)))
-                    )
-            .push(
-                Container::new(
-                    Column::new()
-                    .width(Length::Fill)
-                    .push_maybe(self.create_client_view())
-                    .push(
-                        Scrollable::new(
-                            Column::new()
-                            .padding(12)
-                            .extend(self.filtered_clients.iter().map(
-                                    |client|
-                                        Column::new()
+                        .on_input(|input| AppMessage::Sale(SaleMessage::ClientQuery(input))),
+                )
+                .push(
+                    Container::new(
+                        Column::new()
+                            .width(Length::Fill)
+                            .push_maybe(self.create_client_view())
+                            .push(Scrollable::new(Column::new().padding(12).extend(
+                                self.filtered_clients.iter().map(|client| {
+                                    Column::new()
                                         .push(
                                             Button::new(table_column(&client.name))
-                                            .width(Length::Fill)
-                                            .style(CustomButtonStyle)
-                                          .on_press(AppMessage::Sale(SaleMessage::AddClient(client.client_id, client.name.clone()))))
-                                    .into()
-                                    )))
-                    ))
+                                                .width(Length::Fill)
+                                                .style(CustomButtonStyle)
+                                                .on_press(AppMessage::Sale(
+                                                    SaleMessage::AddClient(
+                                                        client.client_id,
+                                                        client.name.clone(),
+                                                    ),
+                                                )),
+                                        )
+                                        .into()
+                                }),
+                            ))),
+                    )
                     .max_height(200)
-                    .style(card_style())))
+                    .style(card_style()),
+                ),
+        )
     }
-    
+
     fn selected_rep(&self) -> Container<'_, AppMessage> {
         Container::new(
             Column::new()
-            .spacing(8)
-            .push(bold_text("Selected Rep"))
-            .push(
-                Container::new(
-                    Column::new()
-                    .padding(12)
-                    .width(Length::Fill)
-                    .push(Column::new()
-                          .push(Text::new(self.add_sales.rep_name.clone())))
+                .spacing(8)
+                .push(bold_text("Selected Rep"))
+                .push(
+                    Container::new(
+                        Column::new()
+                            .padding(12)
+                            .width(Length::Fill)
+                            .push(Column::new().push(Text::new(self.add_sales.rep_name.clone()))),
                     )
-                .style(card_style())))
+                    .style(card_style()),
+                ),
+        )
     }
 
     fn selected_client(&self) -> Container<'_, AppMessage> {
         Container::new(
             Column::new()
-            .spacing(8)
-            .push(bold_text("Selected Client"))
-            .push(
-                Container::new(
-                    Column::new()
-                    .padding(12)
-                    .width(Length::Fill)
-                    .push(Column::new()
-                          .push(Text::new(self.add_sales.client_name.clone())))
+                .spacing(8)
+                .push(bold_text("Selected Client"))
+                .push(
+                    Container::new(
+                        Column::new().padding(12).width(Length::Fill).push(
+                            Column::new().push(Text::new(self.add_sales.client_name.clone())),
+                        ),
                     )
-                .style(card_style())))
+                    .style(card_style()),
+                ),
+        )
     }
 
     fn select_product(&self) -> Container<'_, AppMessage> {
         Container::new(
             Column::new()
-            .spacing(8)
-            .push(
-                Row::new()
-                .width(Length::Fill)
-                .push(bold_text("Add Products"))
+                .spacing(8)
+                .push(
+                    Row::new()
+                        .width(Length::Fill)
+                        .push(bold_text("Add Products")),
                 )
-            .push(
-                TextInput::new("Search", &self.query)
-                .on_input(|input| AppMessage::Sale(SaleMessage::Query(input)))
+                .push(
+                    TextInput::new("Search", &self.query)
+                        .on_input(|input| AppMessage::Sale(SaleMessage::Query(input))),
                 )
-            .push(
-                Container::new(
+                .push(Container::new(
                     Column::new()
-                    .spacing(4)
-                    .width(Length::Fill)
-                    .push(select_header())
-                    .push(
-                        Scrollable::new(
-                            Column::new()
-                            .spacing(4)
-                            .extend(
-                                self.filtered_products
-                                .iter()
-                                .map(|product| {
-                                    Container::new(
-                                        Row::new()
+                        .spacing(4)
+                        .width(Length::Fill)
+                        .push(select_header())
+                        .push(Scrollable::new(Column::new().spacing(4).extend(
+                            self.filtered_products.iter().map(|product| {
+                                Container::new(
+                                    Row::new()
                                         .width(Length::Fill)
                                         .spacing(4)
                                         .padding(8)
                                         .push(
                                             Column::new()
-                                            .push(Row::new()
-                                                  .push(table_column(&product.name))),
-                                                  )
+                                                .push(Row::new().push(table_column(&product.name))),
+                                        )
                                         .push(
                                             TextInput::new("Quantity", &product.qty.to_string())
-                                            .width(50)
-                                            .on_input(|input| {
-                                                AppMessage::Sale(SaleMessage::ProductQtyChanged(
-                                                        input,
-                                                        product.product_id,
-                                                        product.cost,
-                                                        product.msrp
-                                                        ))
-                                            }),
-                                            ))
-                                                .style(table_row_style())
-                                                .into()
-                                }),
-                                ))),
+                                                .width(50)
+                                                .on_input(|input| {
+                                                    AppMessage::Sale(
+                                                        SaleMessage::ProductQtyChanged(
+                                                            input,
+                                                            product.product_id,
+                                                            product.cost,
+                                                            product.msrp,
+                                                        ),
+                                                    )
+                                                }),
+                                        ),
                                 )
-                                    ))
-                                    .max_height(300)
+                                .style(table_row_style())
+                                .into()
+                            }),
+                        ))),
+                )),
+        )
+        .max_height(300)
     }
 
     fn selected_products(&self) -> Container<'_, AppMessage> {
         Container::new(
             Column::new()
-            .spacing(8)
-            .width(Length::Fill)
-            .push(bold_text("Selected Products"))
-                  .push(
-                      Container::new(
-                          Column::new()
-                          .width(Length::Fill)
-                          .spacing(4)
-                          .push(select_header())
-                          .push(
-                              Scrollable::new(
-                                  Column::new()
-                                  .extend(
-                                      self.products_to_add
-                                      .iter()
-                                      .map(|product| {
-                                          Container::new(
-                                              Row::new()
-                                              .width(Length::Fill)
-                                              .spacing(4)
-                                              .padding(8)
-                                              .push(
-                                                  Column::new()
-                                                  .width(100)
-                                                  .align_items(Alignment::Center)
-                                                  .push(Text::new(&product.name)),
-                                                  )
-                                              .push(
-                                                  Column::new()
-                                                  .width(50)
-                                                  .align_items(Alignment::Center)
-                                                  .push(
-                                                      Text::new(product.qty.to_string())
-                                                      )
-                                                  )
-                                              .push(close_button(AppMessage::Sale(SaleMessage::RemoveProduct(product.product_id)))
-                                                   ))
-                                                   .style(table_row_style())
-                                                   .into()
-                                      }),
-                                      ))))
-                                          ),
-                                          )
-                                              .max_height(300)
+                .spacing(8)
+                .width(Length::Fill)
+                .push(bold_text("Selected Products"))
+                .push(Container::new(
+                    Column::new()
+                        .width(Length::Fill)
+                        .spacing(4)
+                        .push(select_header())
+                        .push(Scrollable::new(Column::new().extend(
+                            self.products_to_add.iter().map(|product| {
+                                Container::new(
+                                    Row::new()
+                                        .width(Length::Fill)
+                                        .spacing(4)
+                                        .padding(8)
+                                        .push(
+                                            Column::new()
+                                                .width(100)
+                                                .align_items(Alignment::Center)
+                                                .push(Text::new(&product.name)),
+                                        )
+                                        .push(
+                                            Column::new()
+                                                .width(50)
+                                                .align_items(Alignment::Center)
+                                                .push(Text::new(product.qty.to_string())),
+                                        )
+                                        .push(close_button(AppMessage::Sale(
+                                            SaleMessage::RemoveProduct(product.product_id),
+                                        ))),
+                                )
+                                .style(table_row_style())
+                                .into()
+                            }),
+                        ))),
+                )),
+        )
+        .max_height(300)
     }
 
     pub fn view(&self) -> Element<AppMessage> {
         layout(
             Column::new()
-            .width(Length::Fill)
-            .padding([12, 0, 0, 12])
-            .align_items(Alignment::Center)
-            .push(Text::new("Sales".to_string())
-                  .size(24))
-            .push(
-                Row::new()
-                  .push(
-                    add_button("Add Sale", AppMessage::Sale(SaleMessage::ShowAddProducts))
-                    )
-                  .padding(12))
-            .push_maybe(self.view_sale())
-            .push_maybe(self.create_view())
-            .push_maybe(self.edit_view())
-            .push(
-                Row::new()
-                .padding(10)
+                .width(Length::Fill)
+                .padding([12, 0, 0, 12])
+                .align_items(Alignment::Center)
+                .push(Text::new("Sales".to_string()).size(24))
                 .push(
-                    Container::new(
-                        Scrollable::new(
-                            table_header(&["Status", "Date", "Discount", "Shipping", "Total", "Cost", "Rep Cut", "Net", "Client", "Rep", "Note"])
-                            .push(
-                                Scrollable::new(
-                                    Column::new()
-                                    .padding([0,8,0,0])
-                                    .extend(self.sales.iter().map(
-                                            |item| 
+                    Row::new()
+                        .push(add_button(
+                            "Add Sale",
+                            AppMessage::Sale(SaleMessage::ShowAddProducts),
+                        ))
+                        .padding(12),
+                )
+                .push_maybe(self.view_sale())
+                .push_maybe(self.create_view())
+                .push_maybe(self.edit_view())
+                .push(
+                    Row::new().padding(10).push(
+                        Container::new(
+                            Scrollable::new(
+                                table_header(&[
+                                    "Status", "Date", "Discount", "Shipping", "Total", "Cost",
+                                    "Rep Cut", "Net", "Client", "Rep", "Note",
+                                ])
+                                .push(Scrollable::new(
+                                    Column::new().padding([0, 8, 0, 0]).extend(
+                                        self.sales.iter().map(|item| {
                                             Button::new(
                                                 Container::new(
-                                                    Column::new()
-                                                    .push(
+                                                    Column::new().push(
                                                         Row::new()
-                                                        .padding(10)
-                                                        .push(table_column(&item.status))
-                                                        .push(table_column(&item.date))
-                                                        .push(table_column(&format!("${:.2}", &item.discount.unwrap_or(0.00))))
-                                                        .push(table_column(&format!("${:.2}", &item.shipping)))
-                                                        .push(table_column(&format!("${:.2}", &item.total)))
-                                                        .push(table_column(&format!("${:.2}", &item.cost)))
-                                                        .push(table_column(&format!("${:.2}", &item.rep_cut.unwrap_or(0.00))))
-                                                        .push(table_column(&format!("${:.2}", &item.net)))
-                                                        .push(table_column(&item.client_name))
-                                                        .push(table_column(&item.rep_name))
-                                                        .push(table_column(&item.note.clone().unwrap_or("".to_string()))))
-                                                    )
-                                                .style(
-                                                    table_row_style()
-                                                    )
+                                                            .padding(10)
+                                                            .push(table_column(&item.status))
+                                                            .push(table_column(&item.date))
+                                                            .push(table_column(&format!(
+                                                                "${:.2}",
+                                                                &item.discount.unwrap_or(0.00)
+                                                            )))
+                                                            .push(table_column(&format!(
+                                                                "${:.2}",
+                                                                &item.shipping
+                                                            )))
+                                                            .push(table_column(&format!(
+                                                                "${:.2}",
+                                                                &item.total
+                                                            )))
+                                                            .push(table_column(&format!(
+                                                                "${:.2}",
+                                                                &item.cost
+                                                            )))
+                                                            .push(table_column(&format!(
+                                                                "${:.2}",
+                                                                &item.rep_cut.unwrap_or(0.00)
+                                                            )))
+                                                            .push(table_column(&format!(
+                                                                "${:.2}",
+                                                                &item.net
+                                                            )))
+                                                            .push(table_column(&item.client_name))
+                                                            .push(table_column(&item.rep_name))
+                                                            .push(table_column(
+                                                                &item
+                                                                    .note
+                                                                    .clone()
+                                                                    .unwrap_or("".to_string()),
+                                                            )),
+                                                    ),
                                                 )
-                                                .style(CustomButtonStyle)
-                                                .on_press(AppMessage::ViewSale(item.clone()))
-                                                .into()
-                                                )))))
-                                                .direction(Direction::Horizontal(Properties::default())))
-                                                .style(table_style())
-                                                .max_height(500))).into())
-                                                .into()
+                                                .style(table_row_style()),
+                                            )
+                                            .style(CustomButtonStyle)
+                                            .on_press(AppMessage::ViewSale(item.clone()))
+                                            .into()
+                                        }),
+                                    ),
+                                )),
+                            )
+                            .direction(Direction::Horizontal(Properties::default())),
+                        )
+                        .style(table_style())
+                        .max_height(500),
+                    ),
+                )
+                .into(),
+        )
+        .into()
     }
 
     fn edit_view(&self) -> Option<Element<AppMessage>> {
         if self.edit_sale {
-        Some(Container::new(
-            Column::new()
-                .push(Container::new(
-                        Column::new()
-                        .push(Text::new("Edit Sale".to_string())
-                              .size(24)
-                              .horizontal_alignment(Horizontal::Center)
-                              .width(Length::Fill))
-                        .push(edit_column("Discount", &self.sale_to_edit.discount.unwrap_or(0.00).to_string(), |input| AppMessage::Sale(SaleMessage::DiscountInput(input, true))))
-                        .push(edit_column("Date", &self.sale_to_edit.date, |input| AppMessage::Sale(SaleMessage::DateInput(input, true))))
-                        .push(edit_column("Note", &self.sale_to_edit.note.clone().unwrap_or("".to_string()), |input| AppMessage::Sale(SaleMessage::NoteInput(input, true))))
-                        .push(Row::new()
-                              .push(Button::new(Text::new("Submit".to_string())
-                                                .horizontal_alignment(Horizontal::Center))
-                                    .on_press(AppMessage::Sale(SaleMessage::Submit(true)))
-                                    .style(CustomMainButtonStyle)
-                                    .width(Length::Fill))
-                              .push(Column::new()
-                                    .width(Length::Fill))
-                              .push(Button::new(Text::new("Delete".to_string())
-                                                .horizontal_alignment(Horizontal::Center))
-                                    .on_press(AppMessage::Sale(SaleMessage::Delete))
-                                    .width(Length::Fill).style(iced::theme::Button::Destructive))))
-                    .padding(24)
-            ).max_width(700))
-            .align_x(Horizontal::Center)
-            .width(Length::Fill)
-            .into())
+            Some(
+                Container::new(
+                    Column::new()
+                        .push(
+                            Container::new(
+                                Column::new()
+                                    .push(
+                                        Text::new("Edit Sale".to_string())
+                                            .size(24)
+                                            .horizontal_alignment(Horizontal::Center)
+                                            .width(Length::Fill),
+                                    )
+                                    .push(text_input_column(
+                                        "Discount",
+                                        &self.sale_to_edit.discount.unwrap_or(0.00).to_string(),
+                                        |input| {
+                                            AppMessage::Sale(SaleMessage::DiscountInput(
+                                                input, true,
+                                            ))
+                                        },
+                                        None,
+                                    ))
+                                    .push(text_input_column(
+                                        "Date",
+                                        &self.sale_to_edit.date,
+                                        |input| {
+                                            AppMessage::Sale(SaleMessage::DateInput(input, true))
+                                        },
+                                        None,
+                                    ))
+                                    .push(text_input_column(
+                                        "Note",
+                                        &self.sale_to_edit.note.clone().unwrap_or("".to_string()),
+                                        |input| {
+                                            AppMessage::Sale(SaleMessage::NoteInput(input, true))
+                                        },
+                                        None,
+                                    ))
+                                    .push(
+                                        Row::new()
+                                            .push(
+                                                Button::new(
+                                                    Text::new("Submit".to_string())
+                                                        .horizontal_alignment(Horizontal::Center),
+                                                )
+                                                .on_press(AppMessage::Sale(SaleMessage::Submit(
+                                                    true,
+                                                )))
+                                                .style(CustomMainButtonStyle)
+                                                .width(Length::Fill),
+                                            )
+                                            .push(Column::new().width(Length::Fill))
+                                            .push(
+                                                Button::new(
+                                                    Text::new("Delete".to_string())
+                                                        .horizontal_alignment(Horizontal::Center),
+                                                )
+                                                .on_press(AppMessage::Sale(SaleMessage::Delete))
+                                                .width(Length::Fill)
+                                                .style(iced::theme::Button::Destructive),
+                                            ),
+                                    ),
+                            )
+                            .padding(24),
+                        )
+                        .max_width(700),
+                )
+                .align_x(Horizontal::Center)
+                .width(Length::Fill)
+                .into(),
+            )
         } else {
             None
         }
@@ -966,89 +1079,113 @@ impl SalesState {
 
     pub fn create_view(&self) -> Option<Element<AppMessage>> {
         if self.add_sale {
-            Some(Scrollable::new(
+            Some(
+                Scrollable::new(
                     Column::new()
-                    .width(Length::Fill)
-                    .align_items(Alignment::Center)
-                    .push(Text::new("Add Sale".to_string())
-                          .size(24))
-                    .push(
-                        Column::new()
-                        .spacing(12)
-                        .padding(24)
-                        .max_width(1000)
+                        .width(Length::Fill)
                         .align_items(Alignment::Center)
+                        .push(Text::new("Add Sale".to_string()).size(24))
                         .push(
-                            text_input_column(
-                                "Discount", 
-                                &self.add_sales.discount.unwrap_or(0.00).to_string(),
-                                |input| AppMessage::Sale(SaleMessage::DiscountInput(input, false)))
-                            )
-                        .push(
-                            text_input_column(
-                                "Date",
-                                &self.add_sales.date,
-                                |input| AppMessage::Sale(SaleMessage::DateInput(input, false))
+                            Column::new()
+                                .spacing(12)
+                                .padding(24)
+                                .max_width(1000)
+                                .align_items(Alignment::Center)
+                                .push(text_input_column(
+                                    "Discount",
+                                    &self.add_sales.discount.unwrap_or(0.00).to_string(),
+                                    |input| {
+                                        AppMessage::Sale(SaleMessage::DiscountInput(input, false))
+                                    },
+                                    None,
+                                ))
+                                .push(text_input_column(
+                                    "Date",
+                                    &self.add_sales.date,
+                                    |input| AppMessage::Sale(SaleMessage::DateInput(input, false)),
+                                    None,
+                                ))
+                                .push(
+                                    Column::new()
+                                        .padding([8, 0, 8, 0])
+                                        .width(Length::Fill)
+                                        .align_items(Alignment::Center)
+                                        .push(
+                                            Row::new()
+                                                .spacing(12)
+                                                .push(self.select_product())
+                                                .push(self.selected_products()),
+                                        ),
                                 )
-                            )
-                        .push(Column::new()
-                              .padding([8, 0, 8, 0])
-                              .width(Length::Fill)
-                              .align_items(Alignment::Center)
-                              .push(
-                                  Row::new()
-                                  .spacing(12)
-                                  .push(self.select_product())
-                                  .push(self.selected_products())
-                                  )
-                             )
-                        .push(Column::new()
-                              .padding([8, 0, 8, 0])
-                              .width(Length::Fill)
-                              .align_items(Alignment::Center)
-                              .push(
-                                  Row::new()
-                                  .spacing(12)
-                                  .push(self.select_client())
-                                  .push(self.selected_client())
-                                  )
-                             )
-                        .push(Column::new()
-                              .padding([8, 0, 8, 0])
-                              .width(Length::Fill)
-                              .align_items(Alignment::Center)
-                              .push(
-                                  Row::new()
-                                  .spacing(12)
-                                  .push(self.select_rep())
-                                  .push(self.selected_rep())
-                                  )
-                             )
-                        .push(
-                            text_input_column(
-                                "Notes",
-                                &self.add_sales.note.clone().unwrap_or("".to_string()),
-                                |input| AppMessage::Sale(SaleMessage::NoteInput(input, false)))
-                            )
-                        .push(Button::new("Submit")
-                              .on_press(AppMessage::Sale(SaleMessage::Submit(false)))
-                              .style(CustomMainButtonStyle))))
-                              .into())
+                                .push(
+                                    Column::new()
+                                        .padding([8, 0, 8, 0])
+                                        .width(Length::Fill)
+                                        .align_items(Alignment::Center)
+                                        .push(
+                                            Row::new()
+                                                .spacing(12)
+                                                .push(self.select_client())
+                                                .push(self.selected_client()),
+                                        ),
+                                )
+                                .push(
+                                    Column::new()
+                                        .padding([8, 0, 8, 0])
+                                        .width(Length::Fill)
+                                        .align_items(Alignment::Center)
+                                        .push(
+                                            Row::new()
+                                                .spacing(12)
+                                                .push(self.select_rep())
+                                                .push(self.selected_rep()),
+                                        ),
+                                )
+                                .push(text_input_column(
+                                    "Notes",
+                                    &self.add_sales.note.clone().unwrap_or("".to_string()),
+                                    |input| AppMessage::Sale(SaleMessage::NoteInput(input, false)),
+                                    None,
+                                ))
+                                .push(
+                                    Button::new("Submit")
+                                        .on_press(AppMessage::Sale(SaleMessage::Submit(false)))
+                                        .style(CustomMainButtonStyle),
+                                ),
+                        ),
+                )
+                .into(),
+            )
         } else {
             None
         }
     }
-    
+
     fn create_rep_view(&self) -> Option<Element<AppMessage>> {
         if self.create_rep {
-            Some(Container::new(
-                    Scrollable::new(
+            Some(
+                Container::new(Scrollable::new(
                     Column::new()
-                    .push(edit_column("Name", &self.rep_to_create.name, |input| AppMessage::Sale(SaleMessage::RepName(input))))
-                    .push(edit_column("Percentage", &self.rep_to_create.percentage.to_string(), |input| AppMessage::Sale(SaleMessage::RepPercentage(input))))
-                    .push(Button::new("Submit")
-                          .on_press(AppMessage::Sale(SaleMessage::CreateRepSubmit))
-                          .style(CustomMainButtonStyle)))).into())
+                        .push(text_input_column(
+                            "Name",
+                            &self.rep_to_create.name,
+                            |input| AppMessage::Sale(SaleMessage::RepName(input)),
+                            None,
+                        ))
+                        .push(text_input_column(
+                            "Percentage",
+                            &self.rep_to_create.percentage.to_string(),
+                            |input| AppMessage::Sale(SaleMessage::RepPercentage(input)),
+                            Some(AppMessage::Sale(SaleMessage::CreateRepSubmit)),
+                        ))
+                        .push(
+                            Button::new("Submit")
+                                .on_press(AppMessage::Sale(SaleMessage::CreateRepSubmit))
+                                .style(CustomMainButtonStyle),
+                        ),
+                ))
+                .into(),
+            )
         } else {
             None
         }
@@ -1056,16 +1193,39 @@ impl SalesState {
 
     fn create_client_view(&self) -> Option<Element<AppMessage>> {
         if self.create_client {
-            Some(Container::new(
-                    Scrollable::new(
+            Some(
+                Container::new(Scrollable::new(
                     Column::new()
-                    .push(edit_column("Name", &self.client_to_create.name, |input| AppMessage::Sale(SaleMessage::ClientName(input))))
-                    .push(edit_column("Address", &self.client_to_create.address, |input| AppMessage::Sale(SaleMessage::ClientAddress(input))))
-                    .push(edit_column("Email", &self.client_to_create.email.clone().unwrap_or("".to_string()), |input| AppMessage::Sale(SaleMessage::ClientEmail(input))))
-                    .push(Button::new("Submit")
-                          .on_press(AppMessage::Sale(SaleMessage::CreateClientSubmit))
-                          .style(CustomMainButtonStyle)
-                          ))).into())
+                        .push(text_input_column(
+                            "Name",
+                            &self.client_to_create.name,
+                            |input| AppMessage::Sale(SaleMessage::ClientName(input)),
+                            None,
+                        ))
+                        .push(text_input_column(
+                            "Address",
+                            &self.client_to_create.address,
+                            |input| AppMessage::Sale(SaleMessage::ClientAddress(input)),
+                            None,
+                        ))
+                        .push(text_input_column(
+                            "Email",
+                            &self
+                                .client_to_create
+                                .email
+                                .clone()
+                                .unwrap_or("".to_string()),
+                            |input| AppMessage::Sale(SaleMessage::ClientEmail(input)),
+                            Some(AppMessage::Sale(SaleMessage::CreateClientSubmit)),
+                        ))
+                        .push(
+                            Button::new("Submit")
+                                .on_press(AppMessage::Sale(SaleMessage::CreateClientSubmit))
+                                .style(CustomMainButtonStyle),
+                        ),
+                ))
+                .into(),
+            )
         } else {
             None
         }
@@ -1073,56 +1233,50 @@ impl SalesState {
 
     fn view_sale(&self) -> Option<Element<AppMessage>> {
         if self.view_sale {
-            Some(Container::new(
+            Some(
+                Container::new(
                     Column::new()
-                            .push(
-                                close_button(AppMessage::Sale(SaleMessage::CloseSale))
-                                )
-                    .push(
-                        Row::new()
-                        .spacing(12)
+                        .push(close_button(AppMessage::Sale(SaleMessage::CloseSale)))
                         .push(
-                            Column::new()
-                            .push(
-                                Row::new()
+                            Row::new()
+                                .spacing(12)
                                 .push(
-                                    Text::new("Status: ")
-                                    )
+                                    Column::new().push(
+                                        Row::new()
+                                            .push(Text::new("Status: "))
+                                            .push(Text::new(&self.sale_to_view.status)),
+                                    ),
+                                )
                                 .push(
-                                Text::new(&self.sale_to_view.status)
-                                )
-                                )
-                            )
-                        .push(
-                            Column::new()
-                            .push(
-                                Button::new("Complete")
-                                .on_press(AppMessage::Sale(SaleMessage::Fulfill))
-                                .style(CustomMainButtonStyle)
-                                )
-                            )
+                                    Column::new().push(
+                                        Button::new("Complete")
+                                            .on_press(AppMessage::Sale(SaleMessage::Fulfill))
+                                            .style(CustomMainButtonStyle),
+                                    ),
+                                ),
                         )
-                    .push(
-                    Row::new()
-                    .push(Column::new()
-                          .push(Row::new()
-                                .push(Text::new("Sale")))
-                          .push(Row::new()
-                                .push(Text::new(&self.sale_to_view.date)))
-                          .push(Row::new()
-                                .push(Text::new("Products")))
-                          .push(Column::new()
-                                .extend(self.sale_products_to_view
-                                        .iter()
-                                        .map(|item|
-                                             Row::new()
-                                             .push(item_view(&item))
-                                             .padding([8,0,8,0])
-                                             .into()
-                                            )))
-                          .padding([0,12,0,0]))
-                    .push(client_view(&self.client_to_view))
-                    )).into())
+                        .push(
+                            Row::new()
+                                .push(
+                                    Column::new()
+                                        .push(Row::new().push(Text::new("Sale")))
+                                        .push(Row::new().push(Text::new(&self.sale_to_view.date)))
+                                        .push(Row::new().push(Text::new("Products")))
+                                        .push(Column::new().extend(
+                                            self.sale_products_to_view.iter().map(|item| {
+                                                Row::new()
+                                                    .push(item_view(&item))
+                                                    .padding([8, 0, 8, 0])
+                                                    .into()
+                                            }),
+                                        ))
+                                        .padding([0, 12, 0, 0]),
+                                )
+                                .push(client_view(&self.client_to_view)),
+                        ),
+                )
+                .into(),
+            )
         } else {
             None
         }

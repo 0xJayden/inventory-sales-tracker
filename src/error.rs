@@ -1,10 +1,8 @@
 use std::env::VarError;
 
-
 #[derive(Clone, Debug)]
 pub enum Errorr {
     ApiError,
-    LanguageError
 }
 
 impl From<sqlx::Error> for Errorr {
