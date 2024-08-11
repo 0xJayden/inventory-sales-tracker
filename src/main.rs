@@ -1,13 +1,3 @@
-#![windows_subsystem = "windows"]
-#![cfg_attr(
-    all(windows, target_arch = "x86_64"),
-    link_args = "-Wl,--subsystem,windows:6.0 /ENTRY:mainCRTStartup"
-)]
-#![cfg_attr(
-    all(windows, target_arch = "x86"),
-    link_args = "-Wl,--subsystem,windows:6.0 /ENTRY:mainCRTStartup"
-)]
-
 use std::env;
 
 use error::Errorr;
