@@ -1,13 +1,18 @@
 use std::env;
 
 use iced::{
-    alignment::{Horizontal, Vertical}, widget::{Button, Column, Container, Row, Scrollable, Text, TextInput}, Alignment, Element, Length
+    alignment::{Horizontal, Vertical},
+    widget::{Button, Column, Container, Row, Scrollable, Text, TextInput},
+    Alignment, Element, Length,
 };
 use regex::Regex;
 use sqlx::SqlitePool;
 
 use crate::{
-    components::{add_button, bold_text, card_style, close_button, layout, table_column, table_header, table_row_style, table_style, text_input_column, CustomButtonStyle, CustomMainButtonStyle},
+    components::{
+        add_button, bold_text, card_style, close_button, layout, table_column, table_header,
+        table_row_style, table_style, text_input_column, CustomButtonStyle, CustomMainButtonStyle,
+    },
     error::Errorr,
     parts::Part,
     AppMessage,
@@ -85,31 +90,19 @@ pub enum PurchaseMessage {
     Submit(bool),
     Delete,
     Query(String),
-    CloseView
+    CloseView,
 }
 
 fn select_part_header() -> Container<'static, AppMessage> {
     Container::new(
         Row::new()
-        .width(Length::Fill)
-        .padding(8)
-        .push(
-            Column::new()
-            .push(bold_text("Name"))
-            .width(120)
-            )
-        .push(
-            Column::new()
-            .push(bold_text("Cost"))
-            .width(110)
-            )
-        .push(
-            Column::new()
-            .push(bold_text("Qty"))
-            .width(60)
-            ),
-            )
-        .style(table_row_style())
+            .width(Length::Fill)
+            .padding(8)
+            .push(Column::new().push(bold_text("Name")).width(120))
+            .push(Column::new().push(bold_text("Cost")).width(110))
+            .push(Column::new().push(bold_text("Qty")).width(60)),
+    )
+    .style(table_row_style())
 }
 
 pub async fn get_purchases() -> Result<Vec<Purchase>, Errorr> {
@@ -447,276 +440,243 @@ impl PurchaseState {
     pub fn view(&self) -> Element<AppMessage> {
         layout(
             Column::new()
-            .width(Length::Fill)
-            .padding([12, 0, 0, 12])
-            .align_items(Alignment::Center)
-            .push(Text::new("Purchases".to_string()).size(24))
-            .push(
-                Row::new()
+                .width(Length::Fill)
+                .padding([12, 0, 0, 12])
+                .align_items(Alignment::Center)
+                .push(Text::new("Purchases".to_string()).size(24))
                 .push(
-                    add_button("Add Purchase", AppMessage::Purchase(PurchaseMessage::ShowAddPurchase))
-                    )
-                .padding(12),
+                    Row::new()
+                        .push(add_button(
+                            "Add Purchase",
+                            AppMessage::Purchase(PurchaseMessage::ShowAddPurchase),
+                        ))
+                        .padding(12),
                 )
-            .push_maybe(self.view_purchase())
-            .push_maybe(self.create_view())
-            .push_maybe(self.edit_view())
-            .push(
-                Container::new(
-                    table_header(&["Date", "Total", "Note"])
-                    .push(
-                        Scrollable::new(
-                            Column::new()
-                            .padding([0,8,0,0])
-                            .extend(
-                                self.purchases
-                                .iter()
-                                .map(|purchase| {
-                                    Button::new(
-                                        Container::new(
-                                            Row::new()
+                .push_maybe(self.view_purchase())
+                .push_maybe(self.create_view())
+                .push_maybe(self.edit_view())
+                .push(
+                    Container::new(table_header(&["Date", "Total", "Note"]).push(
+                        Scrollable::new(Column::new().padding([0, 8, 0, 0]).extend(
+                            self.purchases.iter().map(|purchase| {
+                                Button::new(
+                                    Container::new(
+                                        Row::new()
                                             .padding(10)
                                             .push(table_column(&purchase.date))
                                             .push(table_column(&format!("${:.2}", purchase.total)))
                                             .push(table_column(
-                                                    &purchase.note.clone().unwrap_or("".to_string()),
-                                                    )),
-                                                    )
-                                        .style(table_row_style()),
-                                        )
-                                        .style(CustomButtonStyle)
-                                        .on_press(AppMessage::ViewPurchase(purchase.clone()))
-                                        .into()
-                                })),
-                                )),
-                                )
-                                    .style(table_style()),
+                                                &purchase.note.clone().unwrap_or("".to_string()),
+                                            )),
                                     )
-                                        .into(),
-                                        )
-                                            .into()
+                                    .style(table_row_style()),
+                                )
+                                .style(CustomButtonStyle)
+                                .on_press(AppMessage::ViewPurchase(purchase.clone()))
+                                .into()
+                            }),
+                        )),
+                    ))
+                    .style(table_style()),
+                )
+                .into(),
+        )
+        .into()
     }
 
     fn select_part(&self) -> Container<'_, AppMessage> {
         Container::new(
             Column::new()
-            .width(Length::Fill)
-            .spacing(8)
-            .push(
-                Row::new()
+                .width(Length::Fill)
+                .spacing(8)
                 .push(
-                    Column::new()
-                    .width(Length::Fill)
-                    .push(bold_text("Add Parts")),
-                    )
-                .push(
-                    Column::new()
-                    .width(Length::Fill)
-                    .align_items(Alignment::End)
-                    .push(
-                        Button::new("Create Part")
-                        .on_press(AppMessage::Purchase(
-                                PurchaseMessage::CreatePart,
-                                )
-                                 )
-                        .style(CustomMainButtonStyle)
-                        ),
-                        ),
+                    Row::new()
+                        .push(
+                            Column::new()
+                                .width(Length::Fill)
+                                .push(bold_text("Add Parts")),
                         )
-                            .push_maybe(self.create_part_view())
-                            .push(
-                                TextInput::new("Search", &self.query)
-                                .on_input(|input| AppMessage::Purchase(PurchaseMessage::Query(input))),
-                                )
-                            .push(
+                        .push(
+                            Column::new()
+                                .width(Length::Fill)
+                                .align_items(Alignment::End)
+                                .push(
+                                    Button::new("Create Part")
+                                        .on_press(AppMessage::Purchase(PurchaseMessage::CreatePart))
+                                        .style(CustomMainButtonStyle),
+                                ),
+                        ),
+                )
+                .push_maybe(self.create_part_view())
+                .push(
+                    TextInput::new("Search", &self.query)
+                        .on_input(|input| AppMessage::Purchase(PurchaseMessage::Query(input))),
+                )
+                .push(Container::new(
+                    Column::new()
+                        .spacing(4)
+                        .width(Length::Fill)
+                        .push(select_part_header())
+                        .push(Scrollable::new(Column::new().spacing(4).extend(
+                            self.filtered_parts.iter().map(|part| {
                                 Container::new(
-                                    Column::new()
-                                    .spacing(4)
-                                    .width(Length::Fill)
-                                    .push(select_part_header())
-                                    .push(
-                                        Scrollable::new(
-                                            Column::new()
-                                            .spacing(4)
-                                            .extend(
-                                                self.filtered_parts.iter().map(|part| {
-                                                    Container::new(
-                                                        Row::new()
-                                                        .width(Length::Fill)
-                                                        .spacing(4)
-                                                        .padding(8)
-                                                        .push(
-                                                            Container::new(
-                                                                Text::new(&part.name)
-                                                                )
-                                                            .align_y(Vertical::Center)
-                                                            .height(32)
-                                                            .width(120)
-                                                            )
-                                                        .push(
-                                                            TextInput::new("Cost", parse_input(&part.cost))
-                                                            .width(100)
-                                                            .on_input(|input| {
-                                                                AppMessage::Purchase(
-                                                                    PurchaseMessage::PartCostChanged(
-                                                                        input,
-                                                                        part.part_id,
-                                                                        ),
-                                                                        )
-                                                            }),
-                                                            )
-                                                        .push(
-                                                            TextInput::new("Quantity", &part.qty.to_string())
-                                                            .width(50)
-                                                            .on_input(|input| {
-                                                                AppMessage::Purchase(
-                                                                    PurchaseMessage::PartQtyChanged(
-                                                                        input,
-                                                                        part.part_id,
-                                                                        ),
-                                                                        )
-                                                            }),
-                                                            ))
-                                                                .align_y(Vertical::Center)
-                                                                .style(table_row_style())
-                                                                .into()
-                                                }),
-                                                ))),
-                                                )
-                                                    ),
+                                    Row::new()
+                                        .width(Length::Fill)
+                                        .spacing(4)
+                                        .padding(8)
+                                        .push(
+                                            Container::new(Text::new(&part.name))
+                                                .align_y(Vertical::Center)
+                                                .height(32)
+                                                .width(120),
+                                        )
+                                        .push(
+                                            TextInput::new("Cost", parse_input(&part.cost))
+                                                .width(100)
+                                                .on_input(|input| {
+                                                    AppMessage::Purchase(
+                                                        PurchaseMessage::PartCostChanged(
+                                                            input,
+                                                            part.part_id,
+                                                        ),
                                                     )
-                                                        .max_height(300)
+                                                }),
+                                        )
+                                        .push(
+                                            TextInput::new("Quantity", &part.qty.to_string())
+                                                .width(50)
+                                                .on_input(|input| {
+                                                    AppMessage::Purchase(
+                                                        PurchaseMessage::PartQtyChanged(
+                                                            input,
+                                                            part.part_id,
+                                                        ),
+                                                    )
+                                                }),
+                                        ),
+                                )
+                                .align_y(Vertical::Center)
+                                .style(table_row_style())
+                                .into()
+                            }),
+                        ))),
+                )),
+        )
+        .max_height(300)
     }
 
     fn selected_parts(&self) -> Container<'_, AppMessage> {
         Container::new(
             Column::new()
-            .width(Length::Fill)
-            .spacing(8)
-            .push(
-                Row::new()
-                .push(bold_text("Selected Parts")),
-                )
-            .push(
-                Column::new()
-                .spacing(4)
                 .width(Length::Fill)
-                .push(select_part_header())
+                .spacing(8)
+                .push(Row::new().push(bold_text("Selected Parts")))
                 .push(
-                    Scrollable::new(
-                        Column::new()
+                    Column::new()
                         .spacing(4)
-                        .extend(
+                        .width(Length::Fill)
+                        .push(select_part_header())
+                        .push(Scrollable::new(Column::new().spacing(4).extend(
                             self.parts_to_add.iter().map(|part| {
                                 Container::new(
-                                Row::new()
-                                    .width(Length::Fill)
-                                    .spacing(4)
-                                    .padding(8)
-                                    .push(
-                                        Container::new(
-                                            Text::new(&part.name))
-                                        .align_y(Vertical::Center)
-                                        .height(32)
-                                        .width(120)
+                                    Row::new()
+                                        .width(Length::Fill)
+                                        .spacing(4)
+                                        .padding(8)
+                                        .push(
+                                            Container::new(Text::new(&part.name))
+                                                .align_y(Vertical::Center)
+                                                .height(32)
+                                                .width(120),
                                         )
-                                    .push(
-                                        Container::new(
-                                            Text::new(
-                                                format!(
-                                                    "${:.2}",
-                                                    &part.cost.parse::<f64>().unwrap_or(0.00)
-                                                    )
-                                                )
-                                            )
+                                        .push(
+                                            Container::new(Text::new(format!(
+                                                "${:.2}",
+                                                &part.cost.parse::<f64>().unwrap_or(0.00)
+                                            )))
                                             .align_y(Vertical::Center)
                                             .height(32)
-                                            .width(100)
+                                            .width(100),
                                         )
-                                    .push(
-                                        Container::new(
-                                            Text::new(part.qty.to_string())
-                                            )
-                                            .align_y(Vertical::Center)
-                                            .height(32)
-                                            .width(50)
+                                        .push(
+                                            Container::new(Text::new(part.qty.to_string()))
+                                                .align_y(Vertical::Center)
+                                                .height(32)
+                                                .width(50),
                                         )
-                                    .push(
-                                        close_button(AppMessage::Purchase(
-                                                PurchaseMessage::RemovePart(part.part_id),
-                                                )
-                                          )
-                                    ))
-                                    .style(table_row_style())
-                                    .into()
+                                        .push(close_button(AppMessage::Purchase(
+                                            PurchaseMessage::RemovePart(part.part_id),
+                                        ))),
+                                )
+                                .style(table_row_style())
+                                .into()
                             }),
-                            ))),
-                            ),
-                            )
-                                .max_height(250)
+                        ))),
+                ),
+        )
+        .max_height(250)
     }
 
     pub fn create_view(&self) -> Option<Element<AppMessage>> {
         if self.add_purchase {
             Some(
                 Column::new()
-                .max_width(1000)
-                .push(
-                    Container::new(
-                        Column::new()
-                        .spacing(12)
-                        .push(
-                            Text::new("Add Purchase".to_string())
-                            .size(24)
-                            .horizontal_alignment(Horizontal::Center)
-                            .width(Length::Fill),
-                            )
-                        .push(
-                            text_input_column(
-                                "Date",
-                                &self.purchase_to_add.date,
-                                |input| { 
-                                    AppMessage::Purchase(PurchaseMessage::DateInput(input, false))
-                                },
-                                None 
-                                )
-                            )
-                        .push(
-                            text_input_column(
-                                "Note",
-                                &self.purchase_to_add.note.clone().unwrap_or("".to_string()),
-                                |input| {
-                                    AppMessage::Purchase(PurchaseMessage::NoteInput(input, false))
-                                },
-                                None
-                                )
-                            )
-                        .push(
+                    .max_width(1000)
+                    .push(
+                        Container::new(
                             Column::new()
-                            .width(Length::Fill)
-                            .align_items(Alignment::Center)
-                            .push(
-                                Row::new()
                                 .spacing(12)
-                                .push(self.select_part())
-                                .push(self.selected_parts()),
-                                ),
+                                .push(
+                                    Text::new("Add Purchase".to_string())
+                                        .size(24)
+                                        .horizontal_alignment(Horizontal::Center)
+                                        .width(Length::Fill),
                                 )
-                        .push(
-                            Row::new()
-                            .push(
-                                Button::new("Submit")
-                                .on_press(AppMessage::Purchase(
-                                        PurchaseMessage::Submit(false),
+                                .push(text_input_column(
+                                    "Date",
+                                    &self.purchase_to_add.date,
+                                    |input| {
+                                        AppMessage::Purchase(PurchaseMessage::DateInput(
+                                            input, false,
                                         ))
-                                .style(CustomMainButtonStyle)
-                                ),
-                                ),
+                                    },
+                                    None,
+                                ))
+                                .push(text_input_column(
+                                    "Note",
+                                    &self.purchase_to_add.note.clone().unwrap_or("".to_string()),
+                                    |input| {
+                                        AppMessage::Purchase(PurchaseMessage::NoteInput(
+                                            input, false,
+                                        ))
+                                    },
+                                    None,
+                                ))
+                                .push(
+                                    Column::new()
+                                        .width(Length::Fill)
+                                        .align_items(Alignment::Center)
+                                        .push(
+                                            Row::new()
+                                                .spacing(12)
+                                                .push(self.select_part())
+                                                .push(self.selected_parts()),
+                                        ),
                                 )
-                                    .padding(24),
-                                    )
-                                        .into(),
-                                        )
+                                .push(
+                                    Row::new().push(
+                                        Button::new("Submit")
+                                            .on_press(AppMessage::Purchase(
+                                                PurchaseMessage::Submit(false),
+                                            ))
+                                            .style(CustomMainButtonStyle),
+                                    ),
+                                ),
+                        )
+                        .padding(24),
+                    )
+                    .into(),
+            )
         } else {
             None
         }
@@ -727,57 +687,56 @@ impl PurchaseState {
             Some(
                 Container::new(
                     Column::new()
-                    .width(Length::Fill)
-                    .align_items(Alignment::Center)
-                    .push(
-                        Column::new()
-                        .max_width(700)
+                        .width(Length::Fill)
+                        .align_items(Alignment::Center)
                         .push(
-                            Text::new("Edit Purchase".to_string())
-                            .size(24)
-                            .horizontal_alignment(Horizontal::Center)
-                            .width(Length::Fill),
-                            )
-                        .push(
-                            text_input_column(
-                                "Date", 
-                                &self.purchase_to_edit.date, 
-                                |input| {
-                                    AppMessage::Purchase(
-                                        PurchaseMessage::DateInput(input, true),
-                                        )
-                                },
-                                Some(AppMessage::Purchase(PurchaseMessage::Submit(true))))
-                            )
-                        .push(
-                            Row::new()
-                            .push(
-                                Button::new(
-                                    Text::new("Submit".to_string())
-                                    .horizontal_alignment(Horizontal::Center),
-                                    )
-                                .on_press(AppMessage::Purchase(
-                                        PurchaseMessage::Submit(true),
+                            Column::new()
+                                .max_width(700)
+                                .push(
+                                    Text::new("Edit Purchase".to_string())
+                                        .size(24)
+                                        .horizontal_alignment(Horizontal::Center)
+                                        .width(Length::Fill),
+                                )
+                                .push(text_input_column(
+                                    "Date",
+                                    &self.purchase_to_edit.date,
+                                    |input| {
+                                        AppMessage::Purchase(PurchaseMessage::DateInput(
+                                            input, true,
                                         ))
-                                .style(CustomMainButtonStyle)
-                                .width(Length::Fill),
-                                )
-                            .push(Column::new().width(Length::Fill))
-                            .push(
-                                Button::new(
-                                    Text::new("Delete".to_string())
-                                    .horizontal_alignment(Horizontal::Center),
-                                    )
-                                .on_press(AppMessage::Purchase(PurchaseMessage::Delete))
-                                .width(Length::Fill)
-                                .style(iced::theme::Button::Destructive),
-                                ),
-                                )
-                                    .padding(24),
-                                    ),
-                                    )
-                                        .into(),
+                                    },
+                                    Some(AppMessage::Purchase(PurchaseMessage::Submit(true))),
+                                ))
+                                .push(
+                                    Row::new()
+                                        .push(
+                                            Button::new(
+                                                Text::new("Submit".to_string())
+                                                    .horizontal_alignment(Horizontal::Center),
+                                            )
+                                            .on_press(AppMessage::Purchase(
+                                                PurchaseMessage::Submit(true),
+                                            ))
+                                            .style(CustomMainButtonStyle)
+                                            .width(Length::Fill),
                                         )
+                                        .push(Column::new().width(Length::Fill))
+                                        .push(
+                                            Button::new(
+                                                Text::new("Delete".to_string())
+                                                    .horizontal_alignment(Horizontal::Center),
+                                            )
+                                            .on_press(AppMessage::Purchase(PurchaseMessage::Delete))
+                                            .width(Length::Fill)
+                                            .style(iced::theme::Button::Destructive),
+                                        ),
+                                )
+                                .padding(24),
+                        ),
+                )
+                .into(),
+            )
         } else {
             None
         }
@@ -789,18 +748,15 @@ impl PurchaseState {
                 Container::new(Scrollable::new(
                     Column::new()
                         .push(text_input_column(
-                                "Name", 
-                                &self.part_to_create.name, 
-                                |input| {
-                            AppMessage::Purchase(PurchaseMessage::PartName(input))
-                                },
-                                Some(AppMessage::Purchase(PurchaseMessage::CreatePartSubmit))
-                                )
-                            )
+                            "Name",
+                            &self.part_to_create.name,
+                            |input| AppMessage::Purchase(PurchaseMessage::PartName(input)),
+                            Some(AppMessage::Purchase(PurchaseMessage::CreatePartSubmit)),
+                        ))
                         .push(
                             Button::new("Submit")
                                 .on_press(AppMessage::Purchase(PurchaseMessage::CreatePartSubmit))
-                                .style(CustomMainButtonStyle)
+                                .style(CustomMainButtonStyle),
                         ),
                 ))
                 .into(),
@@ -816,19 +772,19 @@ impl PurchaseState {
                 Container::new(
                     Row::new().push(
                         Column::new()
-                        .push(close_button(AppMessage::Purchase(PurchaseMessage::CloseView)))
+                            .push(close_button(AppMessage::Purchase(
+                                PurchaseMessage::CloseView,
+                            )))
                             .push(Row::new().push(Text::new("Purchase")))
                             .push(Row::new().push(Text::new(&self.purchase_to_view.date)))
                             .push(Row::new().push(Text::new("Parts")))
-                            .push(Column::new()
-                                  .spacing(8)
-                                  .extend(self.purchase_parts_to_view.iter().map(
-                                |part| {
-                                    Row::new()
-                                        .push(part_view(&part))
-                                        .into()
-                                },
-                            )))
+                            .push(
+                                Column::new().spacing(8).extend(
+                                    self.purchase_parts_to_view
+                                        .iter()
+                                        .map(|part| Row::new().push(part_view(&part)).into()),
+                                ),
+                            )
                             .padding([0, 12, 0, 0]),
                     ),
                 )

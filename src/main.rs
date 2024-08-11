@@ -3,11 +3,11 @@ use std::env;
 
 use error::Errorr;
 use home::{get_home, HomeMessage, HomeState, SPS};
-use iced::{
-    executor, window, Application, Command, Element, Theme
-};
+use iced::{executor, window, Application, Command, Element, Theme};
 
-use clients::{add_client, delete_client, edit_client, get_clients, Client, ClientMessage, ClientState};
+use clients::{
+    add_client, delete_client, edit_client, get_clients, Client, ClientMessage, ClientState,
+};
 use manufacture::{
     get_manufactures, Manufacture, ManufactureMessage, ManufactureState, ProductToSelect,
 };
@@ -22,19 +22,20 @@ use purchase::{
 };
 use rep::{add_rep, delete_rep, edit_rep, get_reps, Rep, RepMessage, RepState};
 use sales::{
-    add_client_set, add_rep_set, get_products_and_clients, get_sale_products_and_client, get_sales, Sale, SaleMessage, SaleProductToAdd, SalesState, PCR, SC, R
+    add_client_set, add_rep_set, get_products_and_clients, get_sale_products_and_client, get_sales,
+    Sale, SaleMessage, SaleProductToAdd, SalesState, PCR, R, SC,
 };
 
 mod clients;
+mod components;
 mod error;
+mod home;
 mod manufacture;
 mod parts;
 mod product;
 mod purchase;
-mod sales;
 mod rep;
-mod home;
-mod components;
+mod sales;
 
 #[derive(Debug, Clone)]
 pub enum AppMessage {
@@ -91,7 +92,7 @@ pub enum AppMessage {
     RefetchPurchaseParts(Result<(), Errorr>),
     GoToHome,
     Home(HomeMessage),
-    SaveHome(Result<SPS, Errorr>)
+    SaveHome(Result<SPS, Errorr>),
 }
 
 #[derive(Default, Clone)]
@@ -110,7 +111,7 @@ pub struct App {
     pub clients: ClientState,
     pub reps: RepState,
     pub manufacture: ManufactureState,
-    pub home: HomeState
+    pub home: HomeState,
 }
 
 impl App {
@@ -132,7 +133,10 @@ impl Application for App {
     type Theme = Theme;
 
     fn new(_flags: ()) -> (App, Command<Self::Message>) {
-        (App::default(), Command::perform(get_home(), AppMessage::SaveHome))
+        (
+            App::default(),
+            Command::perform(get_home(), AppMessage::SaveHome),
+        )
     }
 
     fn title(&self) -> String {
@@ -202,7 +206,10 @@ impl Application for App {
                             let i = self.sales.add_sales.clone();
                             let j = self.sales.products_to_select.clone();
                             let k = self.sales.products_to_add.clone();
-                            Command::perform(SalesState::add_sales(j, k, i), AppMessage::RefetchSales)
+                            Command::perform(
+                                SalesState::add_sales(j, k, i),
+                                AppMessage::RefetchSales,
+                            )
                         }
                     }
                     SaleMessage::Delete => {
@@ -215,21 +222,16 @@ impl Application for App {
                     ),
                     SaleMessage::CreateClientSubmit => {
                         let c = self.sales.client_to_create.clone();
-                        Command::perform(
-                            add_client_set(c),
-                            AppMessage::SetClientId,
-                        )
+                        Command::perform(add_client_set(c), AppMessage::SetClientId)
                     }
                     SaleMessage::CreateRepSubmit => {
                         let c = self.sales.rep_to_create.clone();
-                        Command::perform(
-                            add_rep_set(c),
-                            AppMessage::SetRep,
-                        )
+                        Command::perform(add_rep_set(c), AppMessage::SetRep)
                     }
-                    SaleMessage::Fulfill => {
-                        Command::perform(SalesState::fulfill_sale(self.sales.sale_to_view.sale_id), AppMessage::RefetchSalesAndSale)
-                    }
+                    SaleMessage::Fulfill => Command::perform(
+                        SalesState::fulfill_sale(self.sales.sale_to_view.sale_id),
+                        AppMessage::RefetchSalesAndSale,
+                    ),
                     _ => Command::none(),
                 }
             }
@@ -248,14 +250,18 @@ impl Application for App {
 
                         Command::perform(PartsState::add_part(pp), AppMessage::RefetchPurchaseParts)
                     }
-                    PurchaseMessage::Submit => {
-                        let parts_to_add = self.purchase.parts_to_add.clone();
-                        let purchase_to_add = self.purchase.purchase_to_add.clone();
-                        let parts = self.purchase.parts.clone();
-                        Command::perform(
-                            PurchaseState::add_purchase(parts_to_add, purchase_to_add, parts),
-                            AppMessage::RefetchPurchases,
-                        )
+                    PurchaseMessage::Submit(is_edit) => {
+                        if is_edit {
+                            Command::none()
+                        } else {
+                            let parts_to_add = self.purchase.parts_to_add.clone();
+                            let purchase_to_add = self.purchase.purchase_to_add.clone();
+                            let parts = self.purchase.parts.clone();
+                            Command::perform(
+                                PurchaseState::add_purchase(parts_to_add, purchase_to_add, parts),
+                                AppMessage::RefetchPurchases,
+                            )
+                        }
                     }
                     _ => Command::none(),
                 }
@@ -438,7 +444,10 @@ impl Application for App {
             AppMessage::ViewSale(s) => {
                 self.sales.sale_to_view = s.clone();
                 self.sales.view_sale = true;
-                Command::perform(get_sale_products_and_client(s.sale_id, s.client_id), AppMessage::SaveSaleProducts)
+                Command::perform(
+                    get_sale_products_and_client(s.sale_id, s.client_id),
+                    AppMessage::SaveSaleProducts,
+                )
             }
             AppMessage::EditClient(c) => {
                 self.clients.client_to_edit = c;
@@ -545,31 +554,33 @@ impl Application for App {
                 }
                 Command::none()
             }
-            AppMessage::SetClientId(r) => {
-                match r {
-                    Ok(i) => {
-                        self.sales.add_sales.client_id = i;
-                        Command::perform(get_products_and_clients(), AppMessage::SaveProductsAndClients)
-                    }
-                    Err(_) => {
-                        println!("error");
-                        Command::none()
-                    }
+            AppMessage::SetClientId(r) => match r {
+                Ok(i) => {
+                    self.sales.add_sales.client_id = i;
+                    Command::perform(
+                        get_products_and_clients(),
+                        AppMessage::SaveProductsAndClients,
+                    )
                 }
-            }
-            AppMessage::SetRep(r) => {
-                match r {
-                    Ok(i) => {
-                        self.sales.add_sales.rep_id = Some(i.id);
-                        self.sales.add_sales.rep_name = i.name;
-                        Command::perform(get_products_and_clients(), AppMessage::SaveProductsAndClients)
-                    }
-                    Err(_) => {
-                        println!("error");
-                        Command::none()
-                    }
+                Err(_) => {
+                    println!("error");
+                    Command::none()
                 }
-            }
+            },
+            AppMessage::SetRep(r) => match r {
+                Ok(i) => {
+                    self.sales.add_sales.rep_id = Some(i.id);
+                    self.sales.add_sales.rep_name = i.name;
+                    Command::perform(
+                        get_products_and_clients(),
+                        AppMessage::SaveProductsAndClients,
+                    )
+                }
+                Err(_) => {
+                    println!("error");
+                    Command::none()
+                }
+            },
             AppMessage::SaveParts(r) => {
                 match r {
                     Ok(p) => {
@@ -735,18 +746,14 @@ impl Application for App {
                 }
             },
             AppMessage::RefetchSales(r) => match r {
-                Ok(_) => {
-                    Command::perform(get_sales(), AppMessage::SaveSales)
-                }
+                Ok(_) => Command::perform(get_sales(), AppMessage::SaveSales),
                 Err(_) => {
                     println!("error");
                     Command::none()
                 }
             },
             AppMessage::RefetchSalesAndSale(r) => match r {
-                Ok(_) => {
-                    Command::perform(get_sales(), AppMessage::SaveSalesAndSale)
-                }
+                Ok(_) => Command::perform(get_sales(), AppMessage::SaveSalesAndSale),
                 Err(_) => {
                     println!("error");
                     Command::none()
@@ -815,21 +822,24 @@ impl Application for App {
     }
 }
 
-
 #[tokio::main]
 async fn main() -> iced::Result {
     let exe = env::current_exe().unwrap();
-    let contents = exe.parent().unwrap().parent().unwrap().parent().unwrap().to_str().unwrap();
+    let contents = exe
+        .parent()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .to_str()
+        .unwrap();
     env::set_var("DATABASE_URL", format!("{}/db.db", contents));
-    App::run(
-        iced::Settings::from(
-            iced::Settings {
-                window: window::Settings {
-                    icon: Some(window::icon::from_file(format!("{}/assets/icon.ico", contents)).unwrap()),
-                    ..Default::default()
-                },
-                ..Default::default()
-            }
-        )
-    )
+    App::run(iced::Settings::from(iced::Settings {
+        window: window::Settings {
+            icon: Some(window::icon::from_file(format!("{}/assets/icon.ico", contents)).unwrap()),
+            ..Default::default()
+        },
+        ..Default::default()
+    }))
 }
