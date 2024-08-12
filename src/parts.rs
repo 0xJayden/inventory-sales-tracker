@@ -44,7 +44,6 @@ pub struct PartsState {
 pub enum PartsMessage {
     NameInput(String, bool),
     ShowAddPart,
-    ShowEditPart,
     Submit(bool),
     Delete,
 }
@@ -131,13 +130,6 @@ impl PartsState {
                     self.add_part = false;
                 } else {
                     self.add_part = true;
-                }
-            }
-            PartsMessage::ShowEditPart => {
-                if self.edit_part {
-                    self.edit_part = false;
-                } else {
-                    self.edit_part = true;
                 }
             }
             PartsMessage::Submit(is_edit) => {

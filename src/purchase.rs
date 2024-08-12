@@ -80,7 +80,6 @@ pub enum PurchaseMessage {
     DateInput(String, bool),
     NoteInput(String, bool),
     ShowAddPurchase,
-    ShowEditPurchase,
     PartQtyChanged(String, i64),
     PartCostChanged(String, i64),
     RemovePart(i64),
@@ -132,6 +131,24 @@ pub async fn get_purchase_parts(purchase_id: i64) -> Result<Vec<PurchasePart>, E
     .await?;
 
     Ok(purchases)
+}
+
+pub async fn delete_purchase(purchase: Purchase) -> Result<(), Errorr> {
+    let pool = SqlitePool::connect(&env::var("DATABASE_URL")?).await?;
+
+    let id = purchase.id;
+
+    sqlx::query!(
+        "
+        DELETE FROM Purchase
+        WHERE id = ?
+        ",
+        id
+        )
+        .execute(&pool)
+        .await?;
+
+    Ok(())
 }
 
 fn part_view_row(label: &str, value: String) -> Row<'static, AppMessage> {
@@ -313,13 +330,6 @@ impl PurchaseState {
                     self.add_purchase = true;
                 }
             }
-            PurchaseMessage::ShowEditPurchase => {
-                if self.edit_purchase {
-                    self.edit_purchase = false;
-                } else {
-                    self.edit_purchase = true;
-                }
-            }
             PurchaseMessage::PartQtyChanged(q, id) => {
                 if let Some(i) = self
                     .filtered_parts
@@ -411,7 +421,7 @@ impl PurchaseState {
                 }
             }
             PurchaseMessage::Delete => {
-                println!("Deleting...")
+                self.edit_purchase = false;
             }
             PurchaseMessage::Query(q) => {
                 if q.len() > 0 {
@@ -770,24 +780,44 @@ impl PurchaseState {
         if self.view_purchase {
             Some(
                 Container::new(
-                    Row::new().push(
-                        Column::new()
-                            .push(close_button(AppMessage::Purchase(
-                                PurchaseMessage::CloseView,
-                            )))
-                            .push(Row::new().push(Text::new("Purchase")))
-                            .push(Row::new().push(Text::new(&self.purchase_to_view.date)))
-                            .push(Row::new().push(Text::new("Parts")))
+                    Column::new()
+                    .max_width(300)
+                    .push(
+                        Row::new()
+                        .width(Length::Fill)
+                        .push(
+                            Column::new()
+                            .width(Length::Fill)
                             .push(
-                                Column::new().spacing(8).extend(
-                                    self.purchase_parts_to_view
-                                        .iter()
-                                        .map(|part| Row::new().push(part_view(&part)).into()),
-                                ),
+                            close_button(AppMessage::Purchase(
+                                PurchaseMessage::CloseView,
+                                ))
                             )
-                            .padding([0, 12, 0, 0]),
-                    ),
-                )
+                            )
+                        .push(
+                            Column::new()
+                            .width(Length::Fill)
+                            .align_items(Alignment::End)
+                            .push(
+                                Button::new("Edit")
+                                .on_press(AppMessage::EditPurchase(self.purchase_to_view.clone()))
+                                )
+                            )
+                        )
+                    .push(Row::new().push(Text::new("Purchase")))
+                    .push(Row::new().push(Text::new(&self.purchase_to_view.date)))
+                    .push(Row::new().push(Text::new("Parts")))
+                    .push(
+                        Column::new().spacing(8).extend(
+                            self.purchase_parts_to_view
+                            .iter()
+                            .map(|part| Row::new().push(part_view(&part)).into()),
+                            ),
+                            )
+                    .padding([0, 12, 0, 0]),
+                    )
+                        .width(Length::Fill)
+                        .align_x(Horizontal::Center)
                 .into(),
             )
         } else {

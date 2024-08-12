@@ -17,8 +17,7 @@ use product::{
     ProductToAdd,
 };
 use purchase::{
-    get_purchase_parts, get_purchases, PartToSelect, Purchase, PurchaseMessage, PurchasePart,
-    PurchaseState, PurchaseToAdd,
+    delete_purchase, get_purchase_parts, get_purchases, PartToSelect, Purchase, PurchaseMessage, PurchasePart, PurchaseState, PurchaseToAdd
 };
 use rep::{add_rep, delete_rep, edit_rep, get_reps, Rep, RepMessage, RepState};
 use sales::{
@@ -262,6 +261,10 @@ impl Application for App {
                                 AppMessage::RefetchPurchases,
                             )
                         }
+                    }
+                    PurchaseMessage::Delete => {
+                        let p = self.purchase.purchase_to_edit.clone();
+                        Command::perform(delete_purchase(p), AppMessage::RefetchPurchases)
                     }
                     _ => Command::none(),
                 }
