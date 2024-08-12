@@ -9,12 +9,11 @@ use clients::{
     add_client, delete_client, edit_client, get_clients, Client, ClientMessage, ClientState,
 };
 use manufacture::{
-    get_manufactures, Manufacture, ManufactureMessage, ManufactureState, ProductToSelect,
+    delete_manufacture, get_manufactures, Manufacture, ManufactureMessage, ManufactureState, ProductToSelect
 };
 use parts::{get_parts, Part, PartToAdd, PartsMessage, PartsState};
 use product::{
-    get_product_parts, get_products, Product, ProductMessage, ProductPart, ProductState,
-    ProductToAdd,
+    add_product, delete_product, edit_product, get_product_parts, get_products, Product, ProductMessage, ProductPart, ProductState, ProductToAdd
 };
 use purchase::{
     delete_purchase, get_purchase_parts, get_purchases, PartToSelect, Purchase, PurchaseMessage, PurchasePart, PurchaseState, PurchaseToAdd
@@ -170,7 +169,7 @@ impl Application for App {
                         true => {
                             let i = self.products.product_to_edit.clone();
                             Command::perform(
-                                ProductState::edit_product(i),
+                                edit_product(i),
                                 AppMessage::RefetchProducts,
                             )
                         }
@@ -178,7 +177,7 @@ impl Application for App {
                             let product_to_add = self.products.product_to_add.clone();
                             let parts_to_add = self.products.filtered_parts.clone();
                             Command::perform(
-                                ProductState::add_product(product_to_add, parts_to_add),
+                                add_product(product_to_add, parts_to_add),
                                 AppMessage::RefetchProducts,
                             )
                         }
@@ -187,8 +186,8 @@ impl Application for App {
                         Command::perform(get_parts(), AppMessage::SavePartsProducts)
                     }
                     ProductMessage::Delete => {
-                        let i = self.products.product_to_edit.clone();
-                        Command::perform(ProductState::delete_product(i), AppMessage::DoIt)
+                        let i = self.products.product_to_view.clone();
+                        Command::perform(delete_product(i), AppMessage::RefetchProducts)
                     }
                     _ => Command::none(),
                 }
@@ -212,8 +211,8 @@ impl Application for App {
                         }
                     }
                     SaleMessage::Delete => {
-                        let i = self.sales.sale_to_edit.clone();
-                        Command::perform(SalesState::delete_sale(i), AppMessage::DoIt)
+                        let i = self.sales.sale_to_view.clone();
+                        Command::perform(SalesState::delete_sale(i), AppMessage::RefetchSales)
                     }
                     SaleMessage::ShowAddProducts => Command::perform(
                         get_products_and_clients(),
@@ -284,6 +283,42 @@ impl Application for App {
                     PartsMessage::Delete => {
                         let p = self.parts.part_to_edit.clone();
                         Command::perform(PartsState::delete_part(p), AppMessage::RefetchParts)
+                    }
+                    _ => Command::none(),
+                }
+            }
+            AppMessage::Manufacture(msg) => {
+                let _ = self.manufacture.update(msg.clone());
+
+                match msg {
+                    ManufactureMessage::ShowAddManufacture => {
+                        Command::perform(get_products(), AppMessage::SaveManufactureProducts)
+                    }
+                    ManufactureMessage::Submit(is_edit) => match is_edit {
+                        true => {
+                            let i = self.manufacture.manufacture_to_edit.clone();
+                            Command::perform(
+                                ManufactureState::edit_manufacture(i),
+                                AppMessage::RefetchManufactures,
+                            )
+                        }
+                        false => {
+                            let products_to_add = self.manufacture.products_to_add.clone();
+                            let manufacture_to_add = self.manufacture.manufacture_to_add.clone();
+                            let products = self.manufacture.products.clone();
+                            Command::perform(
+                                ManufactureState::add_manufacture(
+                                    products_to_add,
+                                    manufacture_to_add,
+                                    products,
+                                ),
+                                AppMessage::RefetchManufactures,
+                            )
+                        }
+                    },
+                    ManufactureMessage::Delete => {
+                        let m = self.manufacture.manufacture_to_edit.clone();
+                        Command::perform(delete_manufacture(m), AppMessage::RefetchManufactures)
                     }
                     _ => Command::none(),
                 }
@@ -362,38 +397,6 @@ impl Application for App {
                     Err(_) => println!("error"),
                 }
                 Command::none()
-            }
-            AppMessage::Manufacture(msg) => {
-                let _ = self.manufacture.update(msg.clone());
-
-                match msg {
-                    ManufactureMessage::ShowAddManufacture => {
-                        Command::perform(get_products(), AppMessage::SaveManufactureProducts)
-                    }
-                    ManufactureMessage::Submit(is_edit) => match is_edit {
-                        true => {
-                            let i = self.manufacture.manufacture_to_edit.clone();
-                            Command::perform(
-                                ManufactureState::edit_manufacture(i),
-                                AppMessage::RefetchManufactures,
-                            )
-                        }
-                        false => {
-                            let products_to_add = self.manufacture.products_to_add.clone();
-                            let manufacture_to_add = self.manufacture.manufacture_to_add.clone();
-                            let products = self.manufacture.products.clone();
-                            Command::perform(
-                                ManufactureState::add_manufacture(
-                                    products_to_add,
-                                    manufacture_to_add,
-                                    products,
-                                ),
-                                AppMessage::RefetchManufactures,
-                            )
-                        }
-                    },
-                    _ => Command::none(),
-                }
             }
             AppMessage::GoToProducts => {
                 self.clear_state();

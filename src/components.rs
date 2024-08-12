@@ -333,3 +333,24 @@ pub fn close_button(msg: AppMessage) -> Button<'static, AppMessage> {
         .on_press(msg)
         .style(iced::theme::Button::Destructive)
 }
+
+pub fn close_edit_row(close: AppMessage, edit: AppMessage) -> Row<'static, AppMessage> {
+    Row::new()
+        .width(Length::Fill)
+        .push(
+            Column::new()
+            .width(Length::Fill)
+            .push(
+                close_button(close)
+                )
+            )
+        .push(
+            Column::new()
+            .width(Length::Fill)
+            .align_items(Alignment::End)
+            .push(
+                Button::new("Edit")
+                .on_press(edit)
+                )
+            )
+}

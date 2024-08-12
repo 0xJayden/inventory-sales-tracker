@@ -10,8 +10,7 @@ use sqlx::SqlitePool;
 
 use crate::{
     components::{
-        add_button, bold_text, card_style, close_button, layout, table_column, table_header,
-        table_row_style, table_style, text_input_column, CustomButtonStyle, CustomMainButtonStyle,
+        add_button, bold_text, card_style, close_button, close_edit_row, layout, table_column, table_header, table_row_style, table_style, text_input_column, CustomButtonStyle, CustomMainButtonStyle
     },
     error::Errorr,
     parts::Part,
@@ -422,6 +421,7 @@ impl PurchaseState {
             }
             PurchaseMessage::Delete => {
                 self.edit_purchase = false;
+                self.view_purchase = false;
             }
             PurchaseMessage::Query(q) => {
                 if q.len() > 0 {
@@ -783,25 +783,9 @@ impl PurchaseState {
                     Column::new()
                     .max_width(300)
                     .push(
-                        Row::new()
-                        .width(Length::Fill)
-                        .push(
-                            Column::new()
-                            .width(Length::Fill)
-                            .push(
-                            close_button(AppMessage::Purchase(
-                                PurchaseMessage::CloseView,
-                                ))
-                            )
-                            )
-                        .push(
-                            Column::new()
-                            .width(Length::Fill)
-                            .align_items(Alignment::End)
-                            .push(
-                                Button::new("Edit")
-                                .on_press(AppMessage::EditPurchase(self.purchase_to_view.clone()))
-                                )
+                        close_edit_row(
+                            AppMessage::Purchase(PurchaseMessage::CloseView), 
+                            AppMessage::EditPurchase(self.purchase_to_view.clone())
                             )
                         )
                     .push(Row::new().push(Text::new("Purchase")))

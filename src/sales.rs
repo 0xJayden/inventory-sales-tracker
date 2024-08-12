@@ -15,8 +15,7 @@ use sqlx::SqlitePool;
 use crate::{
     clients::{get_client, get_clients, Client},
     components::{
-        add_button, bold_text, card_style, close_button, layout, table_column, table_header,
-        table_row_style, table_style, text_input_column, CustomButtonStyle, CustomMainButtonStyle,
+        add_button, bold_text, card_style, close_button, close_edit_row, layout, table_column, table_header, table_row_style, table_style, text_input_column, CustomButtonStyle, CustomMainButtonStyle
     },
     manufacture::select_header,
     product::{get_products, Product},
@@ -568,6 +567,7 @@ impl SalesState {
             }
             SaleMessage::Delete => {
                 self.edit_sale = false;
+                self.view_sale = false;
             }
             SaleMessage::Submit(is_edit) => {
                 if is_edit {
@@ -1236,7 +1236,13 @@ impl SalesState {
             Some(
                 Container::new(
                     Column::new()
-                        .push(close_button(AppMessage::Sale(SaleMessage::CloseSale)))
+                    .max_width(300)
+                        .push(
+                            close_edit_row(
+                                AppMessage::Sale(SaleMessage::CloseSale),
+                                AppMessage::EditSale(self.sale_to_view.clone())
+                                )
+                            )
                         .push(
                             Row::new()
                                 .spacing(12)
@@ -1275,6 +1281,8 @@ impl SalesState {
                                 .push(client_view(&self.client_to_view)),
                         ),
                 )
+                    .width(Length::Fill)
+                    .align_x(Horizontal::Center)
                 .into(),
             )
         } else {

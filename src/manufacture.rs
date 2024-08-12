@@ -54,7 +54,6 @@ pub struct ManufactureState {
 pub enum ManufactureMessage {
     DateInput(String, bool),
     ShowAddManufacture,
-    ShowEditManufacture,
     ProductQtyChanged(String, i64),
     RemoveProduct(i64),
     Submit(bool),
@@ -81,6 +80,24 @@ pub async fn get_manufactures() -> Result<Vec<Manufacture>, Errorr> {
         .await?;
 
     Ok(manufactures)
+}
+
+pub async fn delete_manufacture(manufacture: Manufacture) -> Result<(), Errorr> {
+    let pool = SqlitePool::connect(&env::var("DATABASE_URL")?).await?;
+
+    let id = manufacture.id;
+
+    sqlx::query!(
+        "
+        DELETE FROM Manufacture
+        WHERE id = ?
+        ",
+        id
+        )
+        .execute(&pool)
+        .await?;
+
+    Ok(())
 }
 
 impl ManufactureState {
@@ -296,13 +313,6 @@ impl ManufactureState {
                     self.add_manufacture = true;
                 }
             }
-            ManufactureMessage::ShowEditManufacture => {
-                if self.edit_manufacture {
-                    self.edit_manufacture = false;
-                } else {
-                    self.edit_manufacture = true;
-                }
-            }
             ManufactureMessage::ProductQtyChanged(q, id) => {
                 if let Some(i) = self
                     .filtered_products
@@ -353,7 +363,7 @@ impl ManufactureState {
                 }
             },
             ManufactureMessage::Delete => {
-                println!("Deleting...")
+                self.edit_manufacture = false;
             }
             ManufactureMessage::Query(q) => {
                 if q.len() > 0 {

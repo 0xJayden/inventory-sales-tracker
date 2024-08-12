@@ -9,9 +9,7 @@ use sqlx::SqlitePool;
 
 use crate::{
     components::{
-        add_button, bold_text, card_style, close_button, layout, table_column, table_header,
-        table_row_qty_style, table_row_style, table_style, text_input_column, CustomButtonStyle,
-        CustomMainButtonStyle,
+        add_button, bold_text, card_style, close_button, close_edit_row, layout, table_column, table_header, table_row_qty_style, table_row_style, table_style, text_input_column, CustomButtonStyle, CustomMainButtonStyle
     },
     error::Errorr,
     manufacture::select_header,
@@ -137,98 +135,98 @@ fn part_view(part: &ProductPart) -> Container<'static, AppMessage> {
     .style(card_style())
 }
 
-impl ProductState {
-    pub async fn add_product(
-        product: ProductToAdd,
-        parts_to_add: Vec<PartToSelect>,
+pub async fn add_product(
+    product: ProductToAdd,
+    parts_to_add: Vec<PartToSelect>,
     ) -> Result<(), Errorr> {
-        let pool = SqlitePool::connect(&env::var("DATABASE_URL")?).await?;
+    let pool = SqlitePool::connect(&env::var("DATABASE_URL")?).await?;
 
-        let name = product.name;
-        let msrp = product.msrp;
-        let mut cost = 0.00;
+    let name = product.name;
+    let msrp = product.msrp;
+    let mut cost = 0.00;
 
-        for part in &parts_to_add {
-            cost += part.cost.parse::<f64>().unwrap_or(0.00) * part.qty as f64;
-        }
+    for part in &parts_to_add {
+        cost += part.cost.parse::<f64>().unwrap_or(0.00) * part.qty as f64;
+    }
 
-        let r = sqlx::query!(
-            "
-            INSERT INTO Product (name, msrp, cost)
-            VALUES (?,?,?)
-            ",
-            name,
-            msrp,
-            cost
+    let r = sqlx::query!(
+        "
+        INSERT INTO Product (name, msrp, cost)
+        VALUES (?,?,?)
+        ",
+        name,
+        msrp,
+        cost
         )
         .execute(&pool)
         .await?;
 
-        let product_id = r.last_insert_rowid();
+    let product_id = r.last_insert_rowid();
 
-        for part in &parts_to_add {
-            sqlx::query!(
-                "
-                INSERT INTO ProductPart (qty, cost, product_id, part_id)
-                VALUES (?,?,?,?)
-                ",
-                part.qty,
-                part.cost,
-                product_id,
-                part.part_id
+    for part in &parts_to_add {
+        sqlx::query!(
+            "
+            INSERT INTO ProductPart (qty, cost, product_id, part_id)
+            VALUES (?,?,?,?)
+            ",
+            part.qty,
+            part.cost,
+            product_id,
+            part.part_id
             )
             .execute(&pool)
             .await?;
-        }
-
-        Ok(())
     }
 
-    pub async fn edit_product(product: Product) -> Result<(), Errorr> {
-        let pool = SqlitePool::connect(&env::var("DATABASE_URL")?).await?;
+    Ok(())
+}
 
-        let id = product.product_id;
-        let name = product.name.as_str();
-        let units = product.units;
-        let cost = product.cost;
-        let msrp = product.msrp;
+pub async fn edit_product(product: Product) -> Result<(), Errorr> {
+    let pool = SqlitePool::connect(&env::var("DATABASE_URL")?).await?;
 
-        sqlx::query!(
-            "
-            UPDATE Product
-            SET name = ?, units = ?, cost = ?, msrp = ?
-            WHERE product_id = ?
-            ",
-            name,
-            units,
-            cost,
-            msrp,
-            id
+    let id = product.product_id;
+    let name = product.name.as_str();
+    let units = product.units;
+    let cost = product.cost;
+    let msrp = product.msrp;
+
+    sqlx::query!(
+        "
+        UPDATE Product
+        SET name = ?, units = ?, cost = ?, msrp = ?
+        WHERE product_id = ?
+        ",
+        name,
+        units,
+        cost,
+        msrp,
+        id
         )
         .execute(&pool)
         .await?;
 
-        Ok(())
-    }
+    Ok(())
+}
 
-    pub async fn delete_product(product: Product) -> Result<(), Errorr> {
-        let pool = SqlitePool::connect(&env::var("DATABASE_URL")?).await?;
+pub async fn delete_product(product: Product) -> Result<(), Errorr> {
+    let pool = SqlitePool::connect(&env::var("DATABASE_URL")?).await?;
 
-        let id = product.product_id;
+    let id = product.product_id;
 
-        sqlx::query!(
-            "
-            DELETE FROM Product
-            WHERE product_id = ?
-            ",
-            id
+    sqlx::query!(
+        "
+        DELETE FROM Product
+        WHERE product_id = ?
+        ",
+        id
         )
         .execute(&pool)
         .await?;
 
-        Ok(())
-    }
+    Ok(())
+}
 
+impl ProductState {
     fn select_part(&self) -> Container<'_, AppMessage> {
         Container::new(
             Column::new()
@@ -370,7 +368,8 @@ impl ProductState {
                 }
             }
             ProductMessage::Delete => {
-                println!("delete");
+                self.edit_product = false;
+                self.view_product = false;
             }
             ProductMessage::PartName(s) => {
                 self.part_to_create.name = s;
@@ -662,9 +661,13 @@ impl ProductState {
         if self.view_product {
             Some(
                 Container::new(
-                    Row::new().push(
-                        Column::new()
-                            .push(close_button(AppMessage::Product(ProductMessage::CloseView)))
+                    Column::new()
+                    .max_width(300)
+                            .push(close_edit_row(
+                                    AppMessage::Product(ProductMessage::CloseView),
+                                    AppMessage::EditProduct(self.product_to_view.clone())
+                                    )
+                                )
                             .push(Row::new().push(Text::new("Product")))
                             .push(Row::new().push(Text::new(&self.product_to_view.name)))
                             .push(Row::new().push(Text::new("Parts")))
@@ -677,8 +680,9 @@ impl ProductState {
                                 },
                             )))
                             .padding([0, 12, 0, 0]),
-                    ),
-                )
+                    )
+                        .width(Length::Fill)
+                        .align_x(Horizontal::Center)
                 .into(),
             )
         } else {
