@@ -175,7 +175,7 @@ impl Application for App {
                         }
                         false => {
                             let product_to_add = self.products.product_to_add.clone();
-                            let parts_to_add = self.products.filtered_parts.clone();
+                            let parts_to_add = self.products.parts_to_add.clone();
                             Command::perform(
                                 add_product(product_to_add, parts_to_add),
                                 AppMessage::RefetchProducts,
@@ -262,7 +262,7 @@ impl Application for App {
                         }
                     }
                     PurchaseMessage::Delete => {
-                        let p = self.purchase.purchase_to_edit.clone();
+                        let p = self.purchase.purchase_to_view.id;
                         Command::perform(delete_purchase(p), AppMessage::RefetchPurchases)
                     }
                     _ => Command::none(),
@@ -476,7 +476,13 @@ impl Application for App {
                 Command::perform(get_purchases(), AppMessage::SavePurchases)
             }
             AppMessage::EditPurchase(p) => {
-                self.purchase.purchase_to_edit = p;
+                self.purchase.purchase_to_edit = PurchaseToAdd {
+                    id: p.id,
+                    note: p.note,
+                    shipping: p.shipping.to_string(),
+                    date: p.date,
+                    total: p.total
+                };
                 self.purchase.edit_purchase = true;
                 Command::none()
             }
@@ -528,7 +534,8 @@ impl Application for App {
             AppMessage::SaveProducts(r) => {
                 match r {
                     Ok(i) => {
-                        self.products.products = i;
+                        self.products.products = i.clone();
+                        self.products.filtered_products = i;
                     }
                     Err(_) => {
                         println!("error");
@@ -590,7 +597,8 @@ impl Application for App {
             AppMessage::SaveParts(r) => {
                 match r {
                     Ok(p) => {
-                        self.parts.parts = p;
+                        self.parts.parts = p.clone();
+                        self.parts.filtered_parts = p;
                     }
                     Err(_) => {
                         println!("error");
@@ -608,7 +616,7 @@ impl Application for App {
                                 part_id: part.part_id,
                                 name: part.name.clone(),
                                 cost: part.cost.to_string(),
-                                qty: 0,
+                                qty: "".to_string(),
                                 total_spent: part.total_spent,
                                 total_units_purchased: part.total_units_purchased,
                             };
@@ -647,7 +655,7 @@ impl Application for App {
                                 part_id: part.part_id,
                                 name: part.name.clone(),
                                 cost: 0.00.to_string(),
-                                qty: 0,
+                                qty: "".to_string(),
                                 total_spent: part.total_spent,
                                 total_units_purchased: part.total_units_purchased,
                             };
@@ -773,14 +781,20 @@ impl Application for App {
                 }
             },
             AppMessage::RefetchClients(r) => match r {
-                Ok(_) => Command::perform(get_clients(), AppMessage::SaveClients),
+                Ok(_) => {
+                    self.clients.client_to_add = Client::default();
+                    Command::perform(get_clients(), AppMessage::SaveClients)
+                }
                 Err(_) => {
                     println!("error");
                     Command::none()
                 }
             },
             AppMessage::RefetchParts(r) => match r {
-                Ok(_) => Command::perform(get_parts(), AppMessage::SaveParts),
+                Ok(_) => {
+                    self.parts.part_to_add = PartToAdd::default();
+                    Command::perform(get_parts(), AppMessage::SaveParts)
+                }
                 Err(_) => {
                     println!("error");
                     Command::none()

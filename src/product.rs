@@ -37,7 +37,7 @@ pub struct ProductToAdd {
 pub struct ProductPart {
     pub id: i64,
     pub name: String,
-    pub qty: i64,
+    pub qty: f64,
     pub cost: f64,
     pub part_id: i64,
     pub product_id: i64,
@@ -46,6 +46,7 @@ pub struct ProductPart {
 #[derive(Default, Clone)]
 pub struct ProductState {
     pub products: Vec<Product>,
+    pub filtered_products: Vec<Product>,
     pub product_to_add: ProductToAdd,
     pub product_to_edit: Product,
     show_add_product: bool,
@@ -75,6 +76,7 @@ pub enum ProductMessage {
     PartQtyChanged(String, i64),
     RemovePart(i64),
     Query(String),
+    FilterProducts(String),
     CloseView,
 }
 
@@ -146,7 +148,7 @@ pub async fn add_product(
     let mut cost = 0.00;
 
     for part in &parts_to_add {
-        cost += part.cost.parse::<f64>().unwrap_or(0.00) * part.qty as f64;
+        cost += part.cost.parse::<f64>().unwrap_or(0.00) * part.qty.parse::<f64>().unwrap_or(0.00);
     }
 
     let r = sqlx::query!(
@@ -359,6 +361,24 @@ impl ProductState {
                     self.show_add_product = false;
                 }
             }
+            ProductMessage::FilterProducts(query) => {
+                if query.len() > 0 {
+                    self.filtered_products = self
+                        .products
+                        .iter()
+                        .filter_map(|product| {
+                            if product.name.to_lowercase().contains(&query.to_lowercase()) {
+                                Some(product.to_owned())
+                            } else {
+                                None
+                            }
+                        })
+                        .collect();
+                } else {
+                    self.filtered_products = self.products.clone()
+                }
+                self.query = query;
+            }
             ProductMessage::ShowAddProduct => {
                 if self.show_add_product {
                     self.show_add_product = false;
@@ -380,23 +400,26 @@ impl ProductState {
                     .iter_mut()
                     .find(|item| item.part_id == id)
                 {
-                    i.qty = q.parse::<i64>().unwrap_or(0);
-                    match self.parts_to_add.iter_mut().find(|item| item.part_id == id) {
-                        Some(p) => {
-                            p.qty = i.qty;
-                            if p.qty == 0 {
-                                let f_parts =
-                                    self.parts_to_add.iter().filter_map(|part| {
-                                        match part.part_id != id {
-                                            true => Some(part.to_owned()),
-                                            false => None,
-                                        }
-                                    });
+                    let valid_input = validate_input(&q);
+                    if valid_input {
+                        i.qty = q;
+                        match self.parts_to_add.iter_mut().find(|item| item.part_id == id) {
+                            Some(p) => {
+                                p.qty = i.qty.clone();
+                                if p.qty.parse::<f64>().unwrap_or(0.00) == 0.00 {
+                                    let f_parts =
+                                        self.parts_to_add.iter().filter_map(|part| {
+                                            match part.part_id != id {
+                                                true => Some(part.to_owned()),
+                                                false => None,
+                                            }
+                                        });
 
-                                self.parts_to_add = f_parts.collect();
+                                    self.parts_to_add = f_parts.collect();
+                                }
                             }
+                            None => self.parts_to_add.push(i.clone()),
                         }
-                        None => self.parts_to_add.push(i.clone()),
                     }
                 }
             }
@@ -427,7 +450,7 @@ impl ProductState {
                         .parts_to_select
                         .iter()
                         .filter_map(|part| {
-                            if part.name.contains(&q) {
+                            if part.name.to_lowercase().contains(&q.to_lowercase()) {
                                 Some(part.to_owned())
                             } else {
                                 None
@@ -461,13 +484,17 @@ impl ProductState {
                         ))
                         .padding(12),
                 )
+                .push(
+                    TextInput::new("Search", &self.query)
+                    .on_input(|input| AppMessage::Product(ProductMessage::FilterProducts(input)))
+                    )
                 .push_maybe(self.create_view())
                 .push_maybe(self.edit_view())
                 .push_maybe(self.view_product())
                 .push(
                     Container::new(
                         table_header(&["Name", "Units", "Cost", "MSRP", "Net"]).push(
-                            Scrollable::new(Column::new().extend(self.products.iter().map(
+                            Scrollable::new(Column::new().extend(self.filtered_products.iter().map(
                                 |product| {
                                     Button::new(
                                         Container::new(
@@ -496,7 +523,7 @@ impl ProductState {
                                                     .as_str(),
                                                 )),
                                         )
-                                        .style(table_row_qty_style(product.units)),
+                                        .style(table_row_qty_style(product.units as f64)),
                                     )
                                     .style(CustomButtonStyle)
                                     .on_press(AppMessage::ViewProduct(product.clone()))
@@ -671,14 +698,14 @@ impl ProductState {
                             .push(Row::new().push(Text::new("Product")))
                             .push(Row::new().push(Text::new(&self.product_to_view.name)))
                             .push(Row::new().push(Text::new("Parts")))
-                            .push(Column::new().extend(self.product_parts_to_view.iter().map(
+                            .push(Scrollable::new(Column::new().extend(self.product_parts_to_view.iter().map(
                                 |part| {
                                     Row::new()
                                         .push(part_view(&part))
                                         .padding([8, 0, 8, 0])
                                         .into()
                                 },
-                            )))
+                            ))))
                             .padding([0, 12, 0, 0]),
                     )
                         .width(Length::Fill)

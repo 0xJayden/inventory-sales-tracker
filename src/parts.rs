@@ -2,7 +2,7 @@ use std::env;
 
 use iced::{
     alignment::Horizontal,
-    widget::{Button, Column, Container, Row, Scrollable, Text},
+    widget::{Button, Column, Container, Row, Scrollable, Text, TextInput},
     Alignment, Element, Length,
 };
 use sqlx::SqlitePool;
@@ -20,10 +20,10 @@ use crate::{
 pub struct Part {
     pub part_id: i64,
     pub name: String,
-    pub units_left: i64,
+    pub units_left: f64,
     pub cost: f64,
     pub total_spent: f64,
-    pub total_units_purchased: i64,
+    pub total_units_purchased: f64,
 }
 
 #[derive(Default, Clone, Debug)]
@@ -34,6 +34,8 @@ pub struct PartToAdd {
 #[derive(Default, Clone)]
 pub struct PartsState {
     pub parts: Vec<Part>,
+    pub filtered_parts: Vec<Part>,
+    query: String,
     pub part_to_add: PartToAdd,
     add_part: bool,
     pub part_to_edit: Part,
@@ -46,6 +48,7 @@ pub enum PartsMessage {
     ShowAddPart,
     Submit(bool),
     Delete,
+    FilterParts(String)
 }
 
 pub async fn get_parts() -> Result<Vec<Part>, Errorr> {
@@ -132,6 +135,24 @@ impl PartsState {
                     self.add_part = true;
                 }
             }
+            PartsMessage::FilterParts(query) => {
+                if query.len() > 0 {
+                    self.filtered_parts = self
+                        .parts
+                        .iter()
+                        .filter_map(|part| {
+                            if part.name.to_lowercase().contains(&query.to_lowercase()) {
+                                Some(part.to_owned())
+                            } else {
+                                None
+                            }
+                        })
+                        .collect();
+                } else {
+                    self.filtered_parts = self.parts.clone()
+                }
+                self.query = query;
+            }
             PartsMessage::Submit(is_edit) => {
                 if is_edit {
                     self.edit_part = false;
@@ -161,6 +182,10 @@ impl PartsState {
                         ))
                         .padding(12),
                 )
+                .push(
+                    TextInput::new("Search", &self.query)
+                    .on_input(|input| AppMessage::Parts(PartsMessage::FilterParts(input)))
+                    )
                 .push_maybe(self.create_view())
                 .push_maybe(self.edit_view())
                 .push(
@@ -173,7 +198,7 @@ impl PartsState {
                             "Total Purchased",
                         ])
                         .push(Scrollable::new(Column::new().extend(
-                            self.parts.iter().map(|item| {
+                            self.filtered_parts.iter().map(|item| {
                                 Button::new(
                                     Container::new(
                                         Row::new()

@@ -283,12 +283,12 @@ pub fn table_row_style() -> container::Appearance {
     }
 }
 
-pub fn table_row_qty_style(qty: i64) -> container::Appearance {
+pub fn table_row_qty_style(qty: f64) -> container::Appearance {
     container::Appearance {
         text_color: Some(Color::BLACK),
-        background: if qty < 10 {
+        background: if qty < 10.00 {
             Some(Background::Color(Color::new(1.0, 0.0, 0.0, 1.0)))
-        } else if qty > 10 && qty < 25 {
+        } else if qty > 10.00 && qty < 25.00 {
             Some(Background::Color(Color::new(1.0, 1.0, 0.0, 1.0)))
         } else {
             Some(Background::Color(Color::WHITE))

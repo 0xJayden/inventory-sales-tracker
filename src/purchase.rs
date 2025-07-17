@@ -23,6 +23,7 @@ pub struct Purchase {
     pub date: String,
     pub total: f64,
     pub note: Option<String>,
+    pub shipping: f64
 }
 
 #[derive(Default, Clone, Debug)]
@@ -35,9 +36,11 @@ pub struct PurchasePart {
 
 #[derive(Default, Clone, Debug)]
 pub struct PurchaseToAdd {
+    pub id: i64,
     pub date: String,
     pub total: f64,
     pub note: Option<String>,
+    pub shipping: String
 }
 
 #[derive(Default, Clone, Debug)]
@@ -45,9 +48,9 @@ pub struct PartToSelect {
     pub part_id: i64,
     pub name: String,
     pub cost: String,
-    pub qty: i64,
+    pub qty: String,
     pub total_spent: f64,
-    pub total_units_purchased: i64,
+    pub total_units_purchased: f64,
 }
 
 #[derive(Default, Clone, Debug)]
@@ -60,7 +63,7 @@ pub struct PurchaseState {
     pub purchases: Vec<Purchase>,
     pub purchase_to_add: PurchaseToAdd,
     add_purchase: bool,
-    pub purchase_to_edit: Purchase,
+    pub purchase_to_edit: PurchaseToAdd,
     pub edit_purchase: bool,
     pub parts: Vec<Part>,
     pub parts_to_select: Vec<PartToSelect>,
@@ -78,6 +81,7 @@ pub struct PurchaseState {
 pub enum PurchaseMessage {
     DateInput(String, bool),
     NoteInput(String, bool),
+    ShippingInput(String, bool),
     ShowAddPurchase,
     PartQtyChanged(String, i64),
     PartCostChanged(String, i64),
@@ -132,17 +136,15 @@ pub async fn get_purchase_parts(purchase_id: i64) -> Result<Vec<PurchasePart>, E
     Ok(purchases)
 }
 
-pub async fn delete_purchase(purchase: Purchase) -> Result<(), Errorr> {
+pub async fn delete_purchase(purchase_id: i64) -> Result<(), Errorr> {
     let pool = SqlitePool::connect(&env::var("DATABASE_URL")?).await?;
-
-    let id = purchase.id;
 
     sqlx::query!(
         "
         DELETE FROM Purchase
         WHERE id = ?
         ",
-        id
+        purchase_id
         )
         .execute(&pool)
         .await?;
@@ -202,15 +204,17 @@ impl PurchaseState {
         let date = purchase_to_add.date;
         let total = purchase_to_add.total;
         let note = purchase_to_add.note;
+        let shipping = purchase_to_add.shipping.parse::<f64>().unwrap();
 
         let r = sqlx::query!(
             "
-            INSERT INTO Purchase (total, date, note)
-            VALUES (?,?,?)
+            INSERT INTO Purchase (total, date, note, shipping)
+            VALUES (?,?,?,?)
             ",
             total,
             date,
-            note
+            note,
+            shipping
         )
         .execute(&pool)
         .await?;
@@ -232,9 +236,9 @@ impl PurchaseState {
             .await?;
 
             let partt = parts.iter().find(|p| p.part_id == part.part_id).unwrap();
-            let total_units = partt.total_units_purchased + part.qty;
+            let total_units = partt.total_units_purchased + part.qty.parse::<f64>().unwrap_or(0.00);
             let total_spent = partt.total_spent + part.cost.parse::<f64>().unwrap_or(0.00);
-            let units_left = partt.units_left + part.qty;
+            let units_left = partt.units_left + part.qty.parse::<f64>().unwrap_or(0.00);
             let cost = total_spent / total_units as f64;
 
             sqlx::query!(
@@ -265,6 +269,7 @@ impl PurchaseState {
             .await?;
         }
 
+        //TODO: Select products that are only being affected
         let products = sqlx::query!(
             "
             SELECT * FROM Product
@@ -329,17 +334,28 @@ impl PurchaseState {
                     self.add_purchase = true;
                 }
             }
+            PurchaseMessage::ShippingInput(s, is_edit) => {
+                let valid_input = validate_input(&s);
+
+                if is_edit && valid_input {
+                    self.purchase_to_edit.shipping = s; 
+                } else if valid_input {
+                    self.purchase_to_add.shipping = s;
+                }
+            }
             PurchaseMessage::PartQtyChanged(q, id) => {
                 if let Some(i) = self
                     .filtered_parts
                     .iter_mut()
                     .find(|item| item.part_id == id)
                 {
-                    i.qty = q.parse::<i64>().unwrap_or(0);
+                    let valid_input = validate_input(&q);
+                    if valid_input {
+                    i.qty = q;
                     match self.parts_to_add.iter_mut().find(|item| item.part_id == id) {
                         Some(p) => {
-                            p.qty = i.qty;
-                            if p.qty == 0 && p.cost == "" {
+                            p.qty = i.qty.clone();
+                            if p.qty.parse::<f64>().unwrap_or(0.00) == 0.00 && p.cost == "" {
                                 let f_parts =
                                     self.parts_to_add.iter().filter_map(|part| {
                                         match part.part_id != id {
@@ -352,6 +368,7 @@ impl PurchaseState {
                             }
                         }
                         None => self.parts_to_add.push(i.clone()),
+                    }
                     }
                 }
             }
@@ -369,7 +386,7 @@ impl PurchaseState {
                     match self.parts_to_add.iter_mut().find(|item| item.part_id == id) {
                         Some(p) => {
                             p.cost = i.cost.clone();
-                            if p.qty == 0 && p.cost == "" {
+                            if p.qty.parse::<f64>().unwrap_or(0.00) == 0.00 && p.cost == "" {
                                 let f_parts =
                                     self.parts_to_add.iter().filter_map(|part| {
                                         match part.part_id != id {
@@ -414,8 +431,9 @@ impl PurchaseState {
                     self.edit_purchase = false;
                 } else {
                     for x in &self.parts_to_add {
-                        self.purchase_to_add.total += x.cost.parse::<f64>().unwrap_or(0.00);
+                        self.purchase_to_add.total += x.cost.parse::<f64>().unwrap_or(0.00); 
                     }
+                    self.purchase_to_add.total += self.purchase_to_add.shipping.parse::<f64>().unwrap_or(0.00);
                     self.add_purchase = false;
                 }
             }
@@ -429,7 +447,7 @@ impl PurchaseState {
                         .parts_to_select
                         .iter()
                         .filter_map(|part| {
-                            if part.name.contains(&q) {
+                            if part.name.to_lowercase().contains(&q.to_lowercase()) {
                                 Some(part.to_owned())
                             } else {
                                 None
@@ -662,6 +680,16 @@ impl PurchaseState {
                                     },
                                     None,
                                 ))
+                                .push(text_input_column(
+                                    "Shipping",
+                                    parse_input(&self.purchase_to_add.shipping.to_string()),
+                                    |input| {
+                                        AppMessage::Purchase(PurchaseMessage::ShippingInput(
+                                            input, false,
+                                        ))
+                                    },
+                                    None,
+                                ))
                                 .push(
                                     Column::new()
                                         .width(Length::Fill)
@@ -790,14 +818,19 @@ impl PurchaseState {
                         )
                     .push(Row::new().push(Text::new("Purchase")))
                     .push(Row::new().push(Text::new(&self.purchase_to_view.date)))
+                    .push(Row::new().push(Text::new(self.purchase_to_view.shipping.to_string())))
                     .push(Row::new().push(Text::new("Parts")))
                     .push(
-                        Column::new().spacing(8).extend(
-                            self.purchase_parts_to_view
-                            .iter()
-                            .map(|part| Row::new().push(part_view(&part)).into()),
+                        Scrollable::new(
+                            Column::new()
+                            .spacing(8)
+                            .extend(
+                                self.purchase_parts_to_view
+                                .iter()
+                                .map(|part| Row::new().push(part_view(&part)).into()),
                             ),
-                            )
+                        )
+                    )
                     .padding([0, 12, 0, 0]),
                     )
                         .width(Length::Fill)

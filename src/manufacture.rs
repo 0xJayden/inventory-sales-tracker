@@ -165,8 +165,8 @@ impl ManufactureState {
                 .fetch_all(&pool)
                 .await?;
 
-            for product_part in &product_parts {
-                let units_left = product_part.units_left - product_part.qty;
+             for product_part in &product_parts {
+                let units_left = product_part.units_left - (product_part.qty * product.qty as f64);
 
                 sqlx::query!(
                     "
@@ -179,8 +179,8 @@ impl ManufactureState {
                 )
                 .execute(&pool)
                 .await?;
-            }
-        }
+            } 
+        } 
 
         Ok(())
     }
@@ -371,7 +371,7 @@ impl ManufactureState {
                         .products_to_select
                         .iter()
                         .filter_map(|product| {
-                            if product.name.contains(&q) {
+                            if product.name.to_lowercase().contains(&q.to_lowercase()) {
                                 Some(product.to_owned())
                             } else {
                                 None
