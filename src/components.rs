@@ -4,7 +4,7 @@ use iced::{
     alignment::Horizontal,
     font::Weight,
     widget::{button, container, svg, Button, Column, Container, Row, Text, TextInput},
-    Alignment, Background, Border, Color, Element, Font, Length, Vector,
+    Alignment, Background, Border, Color, Element, Font, Length, Vector, Padding,
 };
 
 use crate::AppMessage;
@@ -337,6 +337,7 @@ pub fn close_button(msg: AppMessage) -> Button<'static, AppMessage> {
 pub fn close_edit_row(close: AppMessage, edit: AppMessage) -> Row<'static, AppMessage> {
     Row::new()
         .width(Length::Fill)
+        .padding(Padding::from([16, 0]))
         .push(
             Column::new()
             .width(Length::Fill)

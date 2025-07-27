@@ -1,4 +1,5 @@
 use crate::{components::layout, error::Errorr, parts::Part, product::Product, AppMessage};
+use chrono::NaiveDateTime;
 use sqlx::SqlitePool;
 use std::env;
 
@@ -57,7 +58,8 @@ pub struct SPS {
 
 #[derive(Clone, Debug)]
 pub struct SaleH {
-    pub sale_id: i64,
+    pub id: i64,
+    pub created_at: Option<NaiveDateTime>,
     pub discount: Option<f64>,
     pub total: f64,
     pub cost: f64,

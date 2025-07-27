@@ -5,9 +5,9 @@ use iced::{
     alignment::Horizontal,
     widget::{
         scrollable::{Direction, Properties},
-        Button, Column, Container, Row, Scrollable, Text, TextInput,
+        Button, Column, Container, Row, Scrollable, Text, TextInput, container,
     },
-    Alignment, Element, Length,
+    Alignment, Element, Length, Border, Color, Background,
 };
 
 use sqlx::SqlitePool;
@@ -48,7 +48,7 @@ pub struct SaleProductToAdd {
 
 #[derive(Debug, Clone, Default)]
 pub struct Sale {
-    pub sale_id: i64,
+    pub id: i64,
     pub discount: Option<f64>,
     pub total: f64,
     pub cost: f64,
@@ -56,6 +56,8 @@ pub struct Sale {
     pub date: String,
     pub client_id: i64,
     pub client_name: String,
+    pub client_address: String,
+    pub client_email: Option<String>,
     pub note: Option<String>,
     pub rep_id: Option<i64>,
     pub rep_name: String,
@@ -96,7 +98,7 @@ pub struct SalesState {
 #[derive(Debug, Clone, PartialEq)]
 pub enum SaleMessage {
     ProductQtyChanged(String, i64, f64, f64),
-    AddClient(i64, String),
+    AddClient(i64, String, String, Option<String>),
     CreateClient,
     CreateClientSubmit,
     ClientName(String),
@@ -122,18 +124,22 @@ pub enum SaleMessage {
     CopyClientInfo,
     Fulfill,
     CloseSale,
+    CloseAddSale,
 }
 
 pub async fn get_sales() -> Result<Vec<Sale>, Errorr> {
     let pool = SqlitePool::connect(&env::var("DATABASE_URL")?).await?;
 
     let sales = sqlx::query_as!(Sale,
-                                "SELECT Sale.sale_id, discount, total, Sale.cost, Sale.client_id, net, date, note, rep_id, shipping, status, rep_cut,
+                                "SELECT Sale.id, discount, total, Sale.cost, Sale.client_id, net, date, note, rep_id, shipping, status, rep_cut,
                                 Client.name as client_name,
+                                Client.address as client_address,
+                                Client.email as client_email,
                                 Rep.name as rep_name, Rep.percentage as `rep_percentage: u8`
                                 FROM Sale
                                 JOIN Client ON Sale.client_id = Client.client_id
                                 JOIN Rep ON Sale.rep_id = Rep.id
+                                ORDER BY created_at DESC
                                 "
                                )
         .fetch_all(&pool)
@@ -148,7 +154,7 @@ pub struct SC {
     pub client: Client,
 }
 
-pub async fn get_sale_products_and_client(sale_id: i64, client_id: i64) -> Result<SC, Errorr> {
+pub async fn get_sale_products_and_client(id: i64, client_id: i64) -> Result<SC, Errorr> {
     let pool = SqlitePool::connect(&env::var("DATABASE_URL")?).await?;
 
     let sale_products = sqlx::query_as!(SaleProduct,
@@ -159,7 +165,7 @@ pub async fn get_sale_products_and_client(sale_id: i64, client_id: i64) -> Resul
                                JOIN Product ON SaleProduct.product_id = Product.product_id
                                WHERE SaleProduct.sale_id = ?
                                ",
-                               sale_id)
+                               id)
         .fetch_all(&pool)
         .await?;
 
@@ -303,7 +309,7 @@ impl SalesState {
     pub async fn edit_sale(sale: Sale) -> Result<(), Errorr> {
         let pool = SqlitePool::connect(&env::var("DATABASE_URL")?).await?;
 
-        let id = sale.sale_id;
+        let id = sale.id;
         let discount = sale.discount.unwrap_or(0.00);
         let date = sale.date;
         let client = sale.client_id;
@@ -313,7 +319,7 @@ impl SalesState {
             "
             UPDATE Sale
             SET discount = ?, date = ?, client_id = ?, note = ?
-            WHERE sale_id = ?
+            WHERE id = ?
             ",
             discount,
             date,
@@ -334,7 +340,7 @@ impl SalesState {
             "
             UPDATE Sale
             SET status = ?
-            WHERE sale_id = ?
+            WHERE id = ?
             ",
             "COMPLETED",
             id
@@ -348,12 +354,12 @@ impl SalesState {
     pub async fn delete_sale(sale: Sale) -> Result<(), Errorr> {
         let pool = SqlitePool::connect(&env::var("DATABASE_URL")?).await?;
 
-        let id = sale.sale_id;
+        let id = sale.id;
 
         sqlx::query!(
             "
             DELETE FROM Sale
-            WHERE sale_id = ?
+            WHERE id = ?
             ",
             id
         )
@@ -494,9 +500,11 @@ impl SalesState {
                     self.add_sales.date = d;
                 }
             }
-            SaleMessage::AddClient(cid, cname) => {
+            SaleMessage::AddClient(cid, cname, caddress, cemail) => {
                 self.add_sales.client_id = cid;
                 self.add_sales.client_name = cname;
+                self.add_sales.client_address = caddress;
+                self.add_sales.client_email = cemail
             }
             SaleMessage::CreateClient => {
                 if self.create_client {
@@ -680,6 +688,9 @@ impl SalesState {
             SaleMessage::CloseSale => {
                 self.view_sale = false;
             }
+            SaleMessage::CloseAddSale => {
+                self.add_sale = false;
+            }
         }
     }
 
@@ -708,8 +719,9 @@ impl SalesState {
                         Column::new()
                             .width(Length::Fill)
                             .push_maybe(self.create_rep_view())
-                            .push(Scrollable::new(Column::new().padding(12).extend(
+                            .push(Scrollable::new(Column::new().spacing(4).extend(
                                 self.filtered_reps.iter().map(|rep| {
+                                    Container::new(
                                     Column::new()
                                         .push(
                                             Button::new(table_column(&rep.name))
@@ -721,12 +733,13 @@ impl SalesState {
                                                     rep.percentage,
                                                 ))),
                                         )
+                                        )
+                                        .style(table_row_style())
                                         .into()
                                 }),
                             ))),
                     )
                     .max_height(200)
-                    .style(card_style()),
                 ),
         )
     }
@@ -756,10 +769,14 @@ impl SalesState {
                         Column::new()
                             .width(Length::Fill)
                             .push_maybe(self.create_client_view())
-                            .push(Scrollable::new(Column::new().padding(12).extend(
-                                self.filtered_clients.iter().map(|client| {
+                            .push(Scrollable::new(
                                     Column::new()
-                                        .push(
+                                    .spacing(4)
+                                    .extend(
+                                     self.filtered_clients.iter().map(|client| {
+                                         Container::new(
+                                            Column::new()
+                                            .push(
                                             Button::new(table_column(&client.name))
                                                 .width(Length::Fill)
                                                 .style(CustomButtonStyle)
@@ -767,15 +784,18 @@ impl SalesState {
                                                     SaleMessage::AddClient(
                                                         client.client_id,
                                                         client.name.clone(),
+                                                        client.address.clone(),
+                                                        client.email.clone()
                                                     ),
                                                 )),
                                         )
+                                        )
+                                        .style(table_row_style())
                                         .into()
                                 }),
                             ))),
                     )
                     .max_height(200)
-                    .style(card_style()),
                 ),
         )
     }
@@ -804,9 +824,18 @@ impl SalesState {
                 .push(bold_text("Selected Client"))
                 .push(
                     Container::new(
-                        Column::new().padding(12).width(Length::Fill).push(
-                            Column::new().push(Text::new(self.add_sales.client_name.clone())),
-                        ),
+                        Column::new()
+                            .padding(12)
+                            .width(Length::Fill)
+                            .push(
+                                Column::new().push(Text::new(self.add_sales.client_name.clone())),
+                            )
+                            .push(
+                                Column::new().push(Text::new(self.add_sales.client_address.clone())),
+                            )
+                            .push(
+                                Column::new().push(Text::new(self.add_sales.client_email.clone().unwrap_or("".to_string()))),
+                            )
                     )
                     .style(card_style()),
                 ),
@@ -938,6 +967,11 @@ impl SalesState {
                                 .push(Scrollable::new(
                                     Column::new().padding([0, 8, 0, 0]).extend(
                                         self.sales.iter().map(|item| {
+                                            let color = match item.status.as_str() {
+                                                "COMPLETED" => Some(Background::Color(Color::new(0.0, 1.0, 0.0, 1.0))),
+                                                _ => Some(Background::Color(Color::WHITE))
+                                            };
+
                                             Button::new(
                                                 Container::new(
                                                     Column::new().push(
@@ -979,7 +1013,17 @@ impl SalesState {
                                                             )),
                                                     ),
                                                 )
-                                                .style(table_row_style()),
+                                                    .style(
+                                                        container::Appearance {
+                                                            border: Border {
+                                                                color: Color::TRANSPARENT,
+                                                                width: 1.0,
+                                                                radius: 4.0.into(),
+                                                            },
+                                                            background: color,
+                                                            ..Default::default()
+                                                        }
+                                                        )
                                             )
                                             .style(CustomButtonStyle)
                                             .on_press(AppMessage::ViewSale(item.clone()))
@@ -1084,7 +1128,12 @@ impl SalesState {
                     Column::new()
                         .width(Length::Fill)
                         .align_items(Alignment::Center)
-                        .push(Text::new("Add Sale".to_string()).size(24))
+                        .push(
+                            close_button(AppMessage::Sale(
+                                            SaleMessage::CloseAddSale,
+                                            )
+                            )
+                        )
                         .push(
                             Column::new()
                                 .spacing(12)
@@ -1236,7 +1285,7 @@ impl SalesState {
             Some(
                 Container::new(
                     Column::new()
-                    .max_width(300)
+                    .max_width(400)
                         .push(
                             close_edit_row(
                                 AppMessage::Sale(SaleMessage::CloseSale),
@@ -1246,6 +1295,7 @@ impl SalesState {
                         .push(
                             Row::new()
                                 .spacing(12)
+                                .padding([8, 0])
                                 .push(
                                     Column::new().push(
                                         Row::new()

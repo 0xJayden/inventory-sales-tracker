@@ -227,7 +227,7 @@ impl Application for App {
                         Command::perform(add_rep_set(c), AppMessage::SetRep)
                     }
                     SaleMessage::Fulfill => Command::perform(
-                        SalesState::fulfill_sale(self.sales.sale_to_view.sale_id),
+                        SalesState::fulfill_sale(self.sales.sale_to_view.id),
                         AppMessage::RefetchSalesAndSale,
                     ),
                     _ => Command::none(),
@@ -451,7 +451,7 @@ impl Application for App {
                 self.sales.sale_to_view = s.clone();
                 self.sales.view_sale = true;
                 Command::perform(
-                    get_sale_products_and_client(s.sale_id, s.client_id),
+                    get_sale_products_and_client(s.id, s.client_id),
                     AppMessage::SaveSaleProducts,
                 )
             }
