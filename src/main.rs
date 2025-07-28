@@ -726,7 +726,7 @@ impl Application for App {
                                 cost: p.cost,
                                 msrp: p.msrp,
                                 units: p.units,
-                                qty: 0,
+                                qty: "".to_string(),
                             };
 
                             x.push(ps);

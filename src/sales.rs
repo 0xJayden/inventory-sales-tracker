@@ -40,7 +40,7 @@ pub struct SaleProduct {
 pub struct SaleProductToAdd {
     pub product_id: i64,
     pub name: String,
-    pub qty: i64,
+    pub qty: String,
     pub msrp: f64,
     pub cost: f64,
     pub units: i64,
@@ -406,9 +406,9 @@ impl SalesState {
             .execute(&pool)
             .await?;
 
-        let sale_id = sale.last_insert_rowid();
+       let sale_id = sale.last_insert_rowid();
 
-        for item in &j {
+         for item in &j {
             sqlx::query!(
                 "
                 INSERT INTO SaleProduct ( sale_id, qty, product_id, cost_at_sale, msrp_at_sale )
@@ -428,7 +428,7 @@ impl SalesState {
                 .find(|i| i.product_id == item.product_id)
                 .unwrap()
                 .units
-                - item.qty;
+                - item.qty.parse::<i64>().unwrap_or(0);
 
             sqlx::query!(
                 "
@@ -454,7 +454,12 @@ impl SalesState {
                     .iter_mut()
                     .find(|item| item.product_id == id)
                 {
-                    i.qty = qty.parse::<i64>().unwrap_or(0);
+                    let q = qty.parse::<i64>().unwrap_or(0).to_string();
+                    if q == "0".to_string() {
+                        i.qty = "".to_string()
+                    } else {
+                        i.qty = q
+                    }
                     i.cost = cost;
                     i.msrp = msrp;
 
@@ -464,8 +469,8 @@ impl SalesState {
                         .find(|item| item.product_id == id)
                     {
                         Some(p) => {
-                            p.qty = i.qty;
-                            if p.qty == 0 {
+                            p.qty = i.qty.clone();
+                            if p.qty.parse::<i64>().unwrap_or(0) == 0 {
                                 let f_products =
                                     self.products_to_add.iter().filter_map(|product| {
                                         match product.product_id != id {
@@ -584,9 +589,9 @@ impl SalesState {
                 } else {
                     self.products_to_add.iter_mut().for_each(|item| {
                         self.add_sales.cost += item.cost;
-                        let total = item.msrp * item.qty as f64;
+                        let total = item.msrp * item.qty.parse::<f64>().unwrap_or(0.0);
                         self.add_sales.total += total;
-                        self.add_sales.net += total - (item.cost * item.qty as f64);
+                        self.add_sales.net += total - (item.cost * item.qty.parse::<f64>().unwrap_or(0.0));
                     });
 
                     if self.add_sales.total >= 500.00 {
@@ -876,7 +881,7 @@ impl SalesState {
                                                 .push(Row::new().push(table_column(&product.name))),
                                         )
                                         .push(
-                                            TextInput::new("Quantity", &product.qty.to_string())
+                                            TextInput::new("Quantity", &product.qty)
                                                 .width(50)
                                                 .on_input(|input| {
                                                     AppMessage::Sale(
@@ -927,7 +932,7 @@ impl SalesState {
                                             Column::new()
                                                 .width(50)
                                                 .align_items(Alignment::Center)
-                                                .push(Text::new(product.qty.to_string())),
+                                                .push(Text::new(product.qty.clone())),
                                         )
                                         .push(close_button(AppMessage::Sale(
                                             SaleMessage::RemoveProduct(product.product_id),
