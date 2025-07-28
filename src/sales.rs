@@ -125,6 +125,7 @@ pub enum SaleMessage {
     Fulfill,
     CloseSale,
     CloseAddSale,
+    CloseEditSale
 }
 
 pub async fn get_sales() -> Result<Vec<Sale>, Errorr> {
@@ -615,7 +616,7 @@ impl SalesState {
                         .products_to_select
                         .iter()
                         .filter_map(|product| {
-                            if product.name.contains(&q) {
+                            if product.name.to_lowercase().contains(&q.to_lowercase()) {
                                 Some(product.to_owned())
                             } else {
                                 None
@@ -633,7 +634,7 @@ impl SalesState {
                         .clients
                         .iter()
                         .filter_map(|client| {
-                            if client.name.contains(&q) {
+                            if client.name.to_lowercase().contains(&q.to_lowercase()) {
                                 Some(client.to_owned())
                             } else {
                                 None
@@ -651,7 +652,7 @@ impl SalesState {
                         .reps
                         .iter()
                         .filter_map(|rep| {
-                            if rep.name.contains(&q) {
+                            if rep.name.to_lowercase().contains(&q.to_lowercase()) {
                                 Some(rep.to_owned())
                             } else {
                                 None
@@ -690,6 +691,9 @@ impl SalesState {
             }
             SaleMessage::CloseAddSale => {
                 self.add_sale = false;
+            }
+            SaleMessage::CloseEditSale => {
+                self.edit_sale = false;
             }
         }
     }
@@ -953,16 +957,16 @@ impl SalesState {
                         ))
                         .padding(12),
                 )
+                .push_maybe(self.edit_view())
                 .push_maybe(self.view_sale())
                 .push_maybe(self.create_view())
-                .push_maybe(self.edit_view())
                 .push(
                     Row::new().padding(10).push(
                         Container::new(
                             Scrollable::new(
                                 table_header(&[
-                                    "Status", "Date", "Discount", "Shipping", "Total", "Cost",
-                                    "Rep Cut", "Net", "Client", "Rep", "Note",
+                                    "Status", "Date", "Client", "Rep", "Discount", "Shipping", "Total", "Cost",
+                                    "Rep Cut", "Net", "Note",
                                 ])
                                 .push(Scrollable::new(
                                     Column::new().padding([0, 8, 0, 0]).extend(
@@ -979,6 +983,8 @@ impl SalesState {
                                                             .padding(10)
                                                             .push(table_column(&item.status))
                                                             .push(table_column(&item.date))
+                                                            .push(table_column(&item.client_name))
+                                                            .push(table_column(&item.rep_name))
                                                             .push(table_column(&format!(
                                                                 "${:.2}",
                                                                 &item.discount.unwrap_or(0.00)
@@ -1003,8 +1009,6 @@ impl SalesState {
                                                                 "${:.2}",
                                                                 &item.net
                                                             )))
-                                                            .push(table_column(&item.client_name))
-                                                            .push(table_column(&item.rep_name))
                                                             .push(table_column(
                                                                 &item
                                                                     .note
@@ -1051,6 +1055,12 @@ impl SalesState {
                         .push(
                             Container::new(
                                 Column::new()
+                                .push(
+                                    close_button(AppMessage::Sale(
+                                            SaleMessage::CloseEditSale,
+                                            )
+                                                )
+                                    )
                                     .push(
                                         Text::new("Edit Sale".to_string())
                                             .size(24)
@@ -1318,14 +1328,14 @@ impl SalesState {
                                         .push(Row::new().push(Text::new("Sale")))
                                         .push(Row::new().push(Text::new(&self.sale_to_view.date)))
                                         .push(Row::new().push(Text::new("Products")))
-                                        .push(Column::new().extend(
+                                        .push(Scrollable::new(Column::new().extend(
                                             self.sale_products_to_view.iter().map(|item| {
                                                 Row::new()
                                                     .push(item_view(&item))
                                                     .padding([8, 0, 8, 0])
                                                     .into()
                                             }),
-                                        ))
+                                        )))
                                         .padding([0, 12, 0, 0]),
                                 )
                                 .push(client_view(&self.client_to_view)),
