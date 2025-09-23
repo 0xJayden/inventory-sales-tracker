@@ -82,7 +82,7 @@ pub struct SalesState {
     pub client_to_view: Client,
     pub sale_to_view: Sale,
     pub view_sale: bool,
-    query: String,
+    pub query: String,
     pub filtered_products: Vec<SaleProductToAdd>,
     pub products_to_select: Vec<SaleProductToAdd>,
     add_sale: bool,
@@ -90,9 +90,9 @@ pub struct SalesState {
     create_rep: bool,
     pub rep_to_create: Rep,
     pub filtered_clients: Vec<Client>,
-    client_query: String,
+    pub client_query: String,
     pub filtered_reps: Vec<Rep>,
-    rep_query: String,
+    pub rep_query: String,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -121,7 +121,9 @@ pub enum SaleMessage {
     Query(String),
     ClientQuery(String),
     RepQuery(String),
-    CopyClientInfo,
+    CopyClientName,
+    CopyClientAddress,
+    CopyClientEmail,
     Fulfill,
     CloseSale,
     CloseAddSale,
@@ -293,16 +295,32 @@ fn client_view(client: &Client) -> Container<'static, AppMessage> {
     Container::new(
         Column::new()
             .push(Text::new("Client"))
-            .push(client_view_row(client.name.clone()))
+            .push(Row::new()
+                .push(client_view_row(client.name.clone()))
+                .push(
+                     Button::new("Copy")
+                        .on_press(AppMessage::Sale(SaleMessage::CopyClientName))
+                        .style(CustomMainButtonStyle),
+                )
+            )
+            .push(Row::new()
             .push(client_view_row(client.address.clone()))
+            .push(
+                Button::new("Copy")
+                    .on_press(AppMessage::Sale(SaleMessage::CopyClientAddress))
+                    .style(CustomMainButtonStyle),
+            )
+            )
+            .push(Row::new()
             .push(client_view_row(
                 client.email.clone().unwrap_or("".to_string()),
             ))
             .push(
-                Button::new("Copy Client Info")
-                    .on_press(AppMessage::Sale(SaleMessage::CopyClientInfo))
+                Button::new("Copy")
+                    .on_press(AppMessage::Sale(SaleMessage::CopyClientEmail))
                     .style(CustomMainButtonStyle),
-            ),
+            )
+            )
     )
 }
 
@@ -680,12 +698,19 @@ impl SalesState {
 
                 self.products_to_add = f_products.collect();
             }
-            SaleMessage::CopyClientInfo => {
+            SaleMessage::CopyClientName => {
                 let mut ctx: ClipboardContext = ClipboardProvider::new().unwrap();
-                let contents = format!(
-                    "{} {}",
-                    self.client_to_view.name, self.client_to_view.address
-                );
+                let contents = self.client_to_view.name.clone();
+                ctx.set_contents(contents).unwrap();
+            }
+            SaleMessage::CopyClientAddress => {
+                let mut ctx: ClipboardContext = ClipboardProvider::new().unwrap();
+                let contents = self.client_to_view.address.clone();
+                ctx.set_contents(contents).unwrap();
+            }
+            SaleMessage::CopyClientEmail => {
+                let mut ctx: ClipboardContext = ClipboardProvider::new().unwrap();
+                let contents = self.client_to_view.email.clone().unwrap();
                 ctx.set_contents(contents).unwrap();
             }
             SaleMessage::Fulfill => {
@@ -1300,7 +1325,6 @@ impl SalesState {
             Some(
                 Container::new(
                     Column::new()
-                    .max_width(400)
                         .push(
                             close_edit_row(
                                 AppMessage::Sale(SaleMessage::CloseSale),

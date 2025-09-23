@@ -204,6 +204,14 @@ impl Application for App {
                             let i = self.sales.add_sales.clone();
                             let j = self.sales.products_to_select.clone();
                             let k = self.sales.products_to_add.clone();
+                            self.sales.products_to_add = Vec::new();
+                            self.sales.add_sales.client_name = "".to_string();
+                            self.sales.add_sales.client_address = "".to_string();
+                            self.sales.add_sales.client_email = None;
+                            self.sales.add_sales.rep_name = "".to_string();
+                            self.sales.query = "".to_string();
+                            self.sales.rep_query = "".to_string();
+                            self.sales.client_query = "".to_string();
                             Command::perform(
                                 SalesState::add_sales(j, k, i),
                                 AppMessage::RefetchSales,
@@ -220,6 +228,12 @@ impl Application for App {
                     ),
                     SaleMessage::CreateClientSubmit => {
                         let c = self.sales.client_to_create.clone();
+                        self.sales.add_sales.client_name = self.sales.client_to_create.name.clone();
+                        self.sales.add_sales.client_address = self.sales.client_to_create.address.clone();
+                        self.sales.add_sales.client_email = self.sales.client_to_create.email.clone();
+                        self.sales.client_to_create.name = "".to_string();
+                        self.sales.client_to_create.address = "".to_string();
+                        self.sales.client_to_create.email = None;
                         Command::perform(add_client_set(c), AppMessage::SetClientId)
                     }
                     SaleMessage::CreateRepSubmit => {
