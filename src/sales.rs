@@ -576,7 +576,7 @@ impl SalesState {
                 self.rep_to_create.percentage = p.parse::<u8>().unwrap_or(0);
             }
             SaleMessage::NoteInput(n, is_edit) => {
-                if is_edit {
+                if !is_edit {
                     if n.chars().count() == 0 {
                         self.add_sales.note = None;
                     } else {

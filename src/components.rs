@@ -80,6 +80,11 @@ impl button::StyleSheet for CustomButtonStyle {
     fn active(&self, _style: &Self::Style) -> button::Appearance {
         button::Appearance {
             background: Some(Background::Color(Color::TRANSPARENT)),
+            border: Border {
+                color: Color::new(0.3, 0.3, 0.3, 0.5),
+                width: 1.0,
+                radius: 4.0.into()
+            },
             ..Default::default()
         }
     }
@@ -155,6 +160,7 @@ fn navbar_button(handle: svg::Handle, text: &str, msg: AppMessage) -> Button<App
     )
     .on_press(msg)
     .style(CustomButtonStyle)
+    .width(Length::Fill)
 }
 
 fn svg_handle(path: &str) -> svg::Handle {
@@ -224,6 +230,7 @@ fn navbar() -> Container<'static, AppMessage> {
         ..Default::default()
     })
     .height(Length::Fill)
+    .width(200)
     .align_x(Horizontal::Center)
 }
 

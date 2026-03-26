@@ -93,6 +93,8 @@ pub enum PurchaseMessage {
     Delete,
     Query(String),
     CloseView,
+    CloseEdit,
+    CloseCreate,
 }
 
 fn select_part_header() -> Container<'static, AppMessage> {
@@ -460,7 +462,13 @@ impl PurchaseState {
                 self.query = q;
             }
             PurchaseMessage::CloseView => {
-                self.view_purchase = false;
+                        self.view_purchase = false
+            }
+            PurchaseMessage::CloseEdit => {
+                        self.edit_purchase = false
+            }
+            PurchaseMessage::CloseCreate => {
+                        self.add_purchase = false
             }
         }
     }
@@ -655,6 +663,12 @@ impl PurchaseState {
                             Column::new()
                                 .spacing(12)
                                 .push(
+                                    close_button(AppMessage::Purchase(
+                                            PurchaseMessage::CloseCreate,
+                                            )
+                                                )
+                                    )
+                                .push(
                                     Text::new("Add Purchase".to_string())
                                         .size(24)
                                         .horizontal_alignment(Horizontal::Center)
@@ -731,6 +745,12 @@ impl PurchaseState {
                             Column::new()
                                 .max_width(700)
                                 .push(
+                                    close_button(AppMessage::Purchase(
+                                            PurchaseMessage::CloseEdit,
+                                            )
+                                                )
+                                    )
+                                .push(
                                     Text::new("Edit Purchase".to_string())
                                         .size(24)
                                         .horizontal_alignment(Horizontal::Center)
@@ -805,7 +825,7 @@ impl PurchaseState {
     }
 
     fn view_purchase(&self) -> Option<Element<AppMessage>> {
-        if self.view_purchase {
+        if self.view_purchase && !self.edit_purchase {
             Some(
                 Container::new(
                     Column::new()

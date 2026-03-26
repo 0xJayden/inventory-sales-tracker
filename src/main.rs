@@ -205,10 +205,7 @@ impl Application for App {
                             let j = self.sales.products_to_select.clone();
                             let k = self.sales.products_to_add.clone();
                             self.sales.products_to_add = Vec::new();
-                            self.sales.add_sales.client_name = "".to_string();
-                            self.sales.add_sales.client_address = "".to_string();
-                            self.sales.add_sales.client_email = None;
-                            self.sales.add_sales.rep_name = "".to_string();
+                            self.sales.add_sales = Default::default();
                             self.sales.query = "".to_string();
                             self.sales.rep_query = "".to_string();
                             self.sales.client_query = "".to_string();
