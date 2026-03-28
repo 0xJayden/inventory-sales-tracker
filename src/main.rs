@@ -462,7 +462,7 @@ impl Application for App {
                 self.sales.sale_to_view = s.clone();
                 self.sales.view_sale = true;
                 Command::perform(
-                    get_sale_products_and_client(s.id, s.client_id),
+                    get_sale_products_and_client(s.id, s.client_id, s.rep_id),
                     AppMessage::SaveSaleProducts,
                 )
             }
@@ -571,6 +571,7 @@ impl Application for App {
                     Ok(s) => {
                         self.sales.sale_products_to_view = s.sale_products;
                         self.sales.client_to_view = s.client;
+                        self.sales.rep_to_view = s.rep;
                     }
                     Err(_) => {
                         println!("error");

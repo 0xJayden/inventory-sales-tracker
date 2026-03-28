@@ -23,6 +23,13 @@ const BG_COLOR: Color = Color {
     a: 1.0,
 };
 
+const CARD_COLOR: Color = Color {
+    r: 0.95,
+    g: 0.95,
+    b: 0.95,
+    a: 1.0,
+};
+
 const BORDER_COLOR: Color = Color {
     r: 0.7,
     g: 0.7,
@@ -79,7 +86,7 @@ impl button::StyleSheet for CustomButtonStyle {
 
     fn active(&self, _style: &Self::Style) -> button::Appearance {
         button::Appearance {
-            background: Some(Background::Color(Color::TRANSPARENT)),
+            background: Some(Background::Color(CARD_COLOR)),
             border: Border {
                 color: Color::new(0.3, 0.3, 0.3, 0.5),
                 width: 1.0,
@@ -118,6 +125,35 @@ impl button::StyleSheet for CustomMainButtonStyle {
 impl Into<iced::theme::Button> for CustomMainButtonStyle {
     fn into(self) -> iced::theme::Button {
         iced::theme::Button::Custom(Box::new(CustomMainButtonStyle))
+    }
+}
+
+pub struct CustomContainerStyle;
+
+impl container::StyleSheet for CustomContainerStyle {
+    type Style = iced::Theme;
+
+    fn appearance(&self, style: &Self::Style) -> container::Appearance {
+        container::Appearance {
+            background: Some(Background::Color(Color::WHITE)),
+            border: Border {
+                color: BORDER_COLOR,
+                width: 1.0,
+                radius: 4.0.into(),
+            },
+            shadow: iced::Shadow {
+                color: SHADOW_COLOR,
+                offset: Vector { x: 1.0, y: 1.0 },
+                blur_radius: 10.0,
+            },
+            ..Default::default()
+        }
+    }
+}
+
+impl Into<iced::theme::Container> for CustomContainerStyle {
+    fn into(self) -> iced::theme::Container {
+        iced::theme::Container::Custom(Box::new(CustomContainerStyle))
     }
 }
 
@@ -215,20 +251,7 @@ fn navbar() -> Container<'static, AppMessage> {
             .push(navbar_button(client, "Clients", AppMessage::GoToClients))
             .push(navbar_button(rep, "Reps", AppMessage::GoToReps)),
     )
-    .style(container::Appearance {
-        background: Some(Background::Color(Color::WHITE)),
-        border: Border {
-            color: BORDER_COLOR,
-            width: 1.0,
-            radius: 4.0.into(),
-        },
-        shadow: iced::Shadow {
-            color: SHADOW_COLOR,
-            offset: Vector { x: 1.0, y: 1.0 },
-            blur_radius: 10.0,
-        },
-        ..Default::default()
-    })
+    .style(CustomContainerStyle)
     .height(Length::Fill)
     .width(200)
     .align_x(Horizontal::Center)
@@ -252,7 +275,7 @@ pub fn layout(content: Element<AppMessage>) -> Container<AppMessage> {
 
 pub fn card_style() -> container::Appearance {
     container::Appearance {
-        background: Some(Background::Color(Color::WHITE)),
+        background: Some(Background::Color(CARD_COLOR)),
         border: Border {
             color: BORDER_COLOR,
             width: 1.0,

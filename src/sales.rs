@@ -2,25 +2,17 @@ use clipboard::{ClipboardContext, ClipboardProvider};
 use std::env;
 
 use iced::{
-    alignment::Horizontal,
-    widget::{
-        scrollable::{Direction, Properties},
-        Button, Column, Container, Row, Scrollable, Text, TextInput, container,
-    },
-    Alignment, Element, Length, Border, Color, Background,
+    Alignment, Background, Border, Color, Element, Font, Length, alignment::Horizontal, widget::{
+        Button, Column, Container, Row, Scrollable, Text, TextInput, container, scrollable::{Direction, Properties}
+    }
 };
 
 use sqlx::SqlitePool;
 
 use crate::{
-    clients::{get_client, get_clients, Client},
-    components::{
-        add_button, bold_text, card_style, close_button, close_edit_row, layout, table_column, table_header, table_row_style, table_style, text_input_column, CustomButtonStyle, CustomMainButtonStyle
-    },
-    manufacture::select_header,
-    product::{get_products, Product},
-    rep::{get_reps, Rep},
-    AppMessage,
+    AppMessage, clients::{Client, get_client, get_clients}, components::{
+        CustomButtonStyle, CustomContainerStyle, CustomMainButtonStyle, add_button, bold_text, card_style, close_button, close_edit_row, layout, table_column, table_header, table_row_style, table_style, text_input_column
+    }, manufacture::select_header, product::{Product, get_products}, rep::{Rep, get_rep, get_reps}
 };
 
 use crate::error::Errorr;
@@ -87,6 +79,7 @@ pub struct SalesState {
     pub products_to_select: Vec<SaleProductToAdd>,
     add_sale: bool,
     pub reps: Vec<Rep>,
+    pub rep_to_view: Option<Rep>,
     create_rep: bool,
     pub rep_to_create: Rep,
     pub filtered_clients: Vec<Client>,
@@ -155,9 +148,10 @@ pub async fn get_sales() -> Result<Vec<Sale>, Errorr> {
 pub struct SC {
     pub sale_products: Vec<SaleProduct>,
     pub client: Client,
+    pub rep: Option<Rep>
 }
 
-pub async fn get_sale_products_and_client(id: i64, client_id: i64) -> Result<SC, Errorr> {
+pub async fn get_sale_products_and_client(id: i64, client_id: i64, rep_id: Option<i64>) -> Result<SC, Errorr> {
     let pool = SqlitePool::connect(&env::var("DATABASE_URL")?).await?;
 
     let sale_products = sqlx::query_as!(SaleProduct,
@@ -174,9 +168,20 @@ pub async fn get_sale_products_and_client(id: i64, client_id: i64) -> Result<SC,
 
     let client = get_client(client_id).await?;
 
+    let rep: Option<Rep>;
+    match rep_id {
+        Some(id) => {
+            rep = Some(get_rep(id).await?);
+        }
+        None => {
+           rep = None 
+        }
+    }
+
     let r = SC {
         sale_products,
         client,
+        rep
     };
 
     Ok(r)
@@ -294,7 +299,7 @@ fn client_view_row(value: String) -> Row<'static, AppMessage> {
 fn client_view(client: &Client) -> Container<'static, AppMessage> {
     Container::new(
         Column::new()
-            .push(Text::new("Client"))
+            .push(Text::new("Client").size(24))
             .push(Row::new()
                 .push(client_view_row(client.name.clone()))
                 .push(
@@ -322,7 +327,44 @@ fn client_view(client: &Client) -> Container<'static, AppMessage> {
             )
             )
     )
+    .style(CustomContainerStyle)
+    .padding(16)
+    .width(Length::Fill)
 }
+
+fn rep_view(rep: &Option<Rep>) -> Container<'static, AppMessage> {
+    match rep {
+        Some(r) => {
+        Container::new(
+            Column::new()
+            .push(Text::new("Rep").size(24))
+            .push(Row::new()
+                .push(client_view_row(r.name.clone()))
+                .push(
+                    Button::new("Copy")
+                    .on_press(AppMessage::Sale(SaleMessage::CopyClientName))
+                    .style(CustomMainButtonStyle),
+                )
+            )
+            )
+            .style(CustomContainerStyle)
+            .padding(16)
+            .width(Length::Fill)
+        }
+        None => {
+        Container::new(
+            Column::new()
+            .push(Text::new("Rep"))
+            .push(Row::new()
+                .push(Text::new("No Rep"))
+            )
+            )
+            .style(CustomContainerStyle)
+            .padding(16)
+        }
+    }
+}
+
 
 impl SalesState {
     pub async fn edit_sale(sale: Sale) -> Result<(), Errorr> {
@@ -1350,25 +1392,62 @@ impl SalesState {
                                     ),
                                 ),
                         )
+                                        .push(
+                                            Row::new()
+                                            .push(Text::new("Date: "))
+                                            .push(Text::new(&self.sale_to_view.date))
+                                            )
                         .push(
+                            Container::new(
                             Row::new()
                                 .push(
                                     Column::new()
-                                        .push(Row::new().push(Text::new("Sale")))
-                                        .push(Row::new().push(Text::new(&self.sale_to_view.date)))
-                                        .push(Row::new().push(Text::new("Products")))
-                                        .push(Scrollable::new(Column::new().extend(
-                                            self.sale_products_to_view.iter().map(|item| {
-                                                Row::new()
-                                                    .push(item_view(&item))
-                                                    .padding([8, 0, 8, 0])
-                                                    .into()
-                                            }),
-                                        )))
-                                        .padding([0, 12, 0, 0]),
+                                        .push(Container::new(
+                                                Column::new()
+                                                .push(Row::new()
+                                                    .push(
+                                                        Text::new("Products").size(24)
+                                                        )
+                                                    .push(
+                                                        Column::new()
+                                                        .push(
+                                                            Button::new("Add")
+                                                        )
+                                                        .width(Length::Fill)
+                                                        .align_items(Alignment::End)
+                                                    )
+                                                    )
+                                                .push(Scrollable::new(Column::new().extend(
+                                                            self.sale_products_to_view.iter().map(|item| {
+                                                                Row::new()
+                                                                    .push(item_view(&item))
+                                                                    .padding([8, 0, 8, 0])
+                                                                    .into()
+                                                            }),
+                                                )))
+                                                .padding([0, 12, 0, 0])
+                                                .width(Length::Fill)
+                                        )
+                                            .style(CustomContainerStyle)
+                                            .padding(16)
+                                            .align_x(Horizontal::Center)
+                                            )
                                 )
-                                .push(client_view(&self.client_to_view)),
-                        ),
+                                .push(
+                                    Column::new()
+                                    .push(client_view(&self.client_to_view))
+                                    .push(rep_view(&self.rep_to_view))
+                                    .spacing(16)
+                                    .width(Length::Fill)
+                                    .align_items(Alignment::End)
+                                    )
+                                .spacing(16)
+                        )
+                    .width(Length::Fill)
+                    .align_x(Horizontal::Center)
+                        )
+                        .spacing(16)
+                        
                 )
                     .width(Length::Fill)
                     .align_x(Horizontal::Center)
