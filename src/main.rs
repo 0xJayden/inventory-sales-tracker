@@ -86,6 +86,7 @@ pub enum AppMessage {
     SaveSales(Result<Vec<Sale>, Errorr>),
     SaveSalesAndSale(Result<Vec<Sale>, Errorr>),
     SaveProducts(Result<Vec<Product>, Errorr>),
+    SaveProductsToSales(Result<Vec<Product>, Errorr>),
     SetClientId(Result<i64, Errorr>),
     RefetchPurchaseParts(Result<(), Errorr>),
     GoToHome,
@@ -215,6 +216,16 @@ impl Application for App {
                             )
                         }
                     }
+                    SaleMessage::SubmitAddProduct => {
+                        let j = self.sales.products_to_select.clone();
+                        let k = self.sales.products_to_add.clone();
+                        self.sales.products_to_add = Vec::new();
+                        self.sales.query = "".to_string();
+                        Command::perform(
+                            SalesState::add_products_to_sale(j, k, self.sales.sale_to_view.id),
+                            AppMessage::RefetchSales,
+                        )
+                    }
                     SaleMessage::Delete => {
                         let i = self.sales.sale_to_view.clone();
                         Command::perform(SalesState::delete_sale(i), AppMessage::RefetchSales)
@@ -222,6 +233,10 @@ impl Application for App {
                     SaleMessage::ShowAddProducts => Command::perform(
                         get_products_and_clients(),
                         AppMessage::SaveProductsAndClients,
+                    ),
+                    SaleMessage::AddProduct => Command::perform(
+                        get_products(),
+                        AppMessage::SaveProductsToSales,
                     ),
                     SaleMessage::CreateClientSubmit => {
                         let c = self.sales.client_to_create.clone();
@@ -830,6 +845,33 @@ impl Application for App {
                     Command::none()
                 }
             },
+            AppMessage::SaveProductsToSales(r) => {
+                match r {
+                    Ok(i) => {
+                        let mut x: Vec<SaleProductToAdd> = Vec::new();
+
+                        for p in &i {
+                            let ps = SaleProductToAdd {
+                                product_id: p.product_id,
+                                name: p.name.clone(),
+                                cost: p.cost,
+                                msrp: p.msrp,
+                                units: p.units,
+                                qty: "".to_string(),
+                            };
+
+                            x.push(ps);
+                        }
+
+                        self.sales.products_to_select = x.clone();
+                        self.sales.filtered_products = x;
+                    }
+                    Err(_) => {
+                        println!("error");
+                    }
+                }
+                Command::none()
+            }
         }
     }
 

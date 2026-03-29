@@ -2,12 +2,14 @@ use clipboard::{ClipboardContext, ClipboardProvider};
 use std::env;
 
 use iced::{
-    Alignment, Background, Border, Color, Element, Font, Length, alignment::Horizontal, widget::{
+    Alignment, Background, Border, Color, Element, Length, alignment::Horizontal, widget::{
         Button, Column, Container, Row, Scrollable, Text, TextInput, container, scrollable::{Direction, Properties}
     }
 };
 
-use sqlx::SqlitePool;
+use sqlx::{SqlitePool, types::Json};
+
+use serde::{Deserialize};
 
 use crate::{
     AppMessage, clients::{Client, get_client, get_clients}, components::{
@@ -28,7 +30,7 @@ pub struct SaleProduct {
     pub msrp_at_sale: f64,
 }
 
-#[derive(Clone, Default, Debug)]
+#[derive(Clone, Default, Debug, Deserialize)]
 pub struct SaleProductToAdd {
     pub product_id: i64,
     pub name: String,
@@ -36,6 +38,23 @@ pub struct SaleProductToAdd {
     pub msrp: f64,
     pub cost: f64,
     pub units: i64,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct SaleToAddProduct {
+    pub id: i64,
+    pub discount: Option<f64>,
+    pub total: f64,
+    pub cost: f64,
+    pub net: f64,
+    pub date: String,
+    pub rep_id: Option<i64>,
+    pub rep_name: String,
+    pub rep_percentage: u8,
+    pub rep_cut: Option<f64>,
+    pub status: String,
+    pub shipping: f64,
+    pub products: Json<Vec<SaleProductToAdd>>
 }
 
 #[derive(Debug, Clone, Default)]
@@ -86,6 +105,7 @@ pub struct SalesState {
     pub client_query: String,
     pub filtered_reps: Vec<Rep>,
     pub rep_query: String,
+    pub add_product_to_sale: bool
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -120,7 +140,10 @@ pub enum SaleMessage {
     Fulfill,
     CloseSale,
     CloseAddSale,
-    CloseEditSale
+    CloseEditSale,
+    AddProduct,
+    CloseAddProduct,
+    SubmitAddProduct,
 }
 
 pub async fn get_sales() -> Result<Vec<Sale>, Errorr> {
@@ -505,6 +528,119 @@ impl SalesState {
 
         Ok(())
     }
+    
+    pub async fn add_products_to_sale(
+        i: Vec<SaleProductToAdd>,
+        j: Vec<SaleProductToAdd>,
+        sale_id: i64,
+    ) -> Result<(), Errorr> {
+        let pool = SqlitePool::connect(&env::var("DATABASE_URL")?).await?;
+
+        let sale = sqlx::query_as!(SaleToAddProduct,
+            r#"
+            SELECT Sale.id, discount, total, Sale.cost, net, date, rep_id, shipping, status, rep_cut,
+            Rep.name as rep_name, Rep.percentage as `rep_percentage: u8`,
+            json_group_array(
+                json_object('product_id', SaleProduct.product_id, 'name', name, 'units', 0, 'qty', CAST(SaleProduct.qty AS TEXT), 'msrp', SaleProduct.msrp_at_sale, 'cost', SaleProduct.cost_at_sale)
+            ) as "products: Json<Vec<SaleProductToAdd>>"
+            FROM Sale
+            JOIN Rep ON Sale.rep_id = Rep.id
+            JOIN SaleProduct ON Sale.id = SaleProduct.sale_id
+            WHERE Sale.id = ?
+            GROUP BY Sale.id
+            "#,
+            sale_id
+        )
+            .fetch_one(&pool)
+            .await?;
+
+        let mut cost = 0.00;
+        let mut total = 0.00;
+        let mut shipping = 0.00;
+        let mut net = 0.00;
+        let mut rep_cut: Option<f64> = None;
+
+        for item in &j {
+            cost += item.cost * item.qty.parse::<f64>().unwrap_or(0.0);
+            let item_total = item.msrp * item.qty.parse::<f64>().unwrap_or(0.0);
+            total += item_total;
+            net += item_total - (item.cost * item.qty.parse::<f64>().unwrap_or(0.0));
+
+            sqlx::query!(
+                "
+                INSERT INTO SaleProduct ( sale_id, qty, product_id, cost_at_sale, msrp_at_sale )
+                VALUES (?,?,?,?,?)
+                ",
+                sale_id,
+                item.qty,
+                item.product_id,
+                item.cost,
+                item.msrp
+            )
+                .execute(&pool)
+                .await?;
+
+            let units = i
+                .iter()
+                .find(|i| i.product_id == item.product_id)
+                .unwrap()
+                .units
+                - item.qty.parse::<i64>().unwrap_or(0);
+
+            sqlx::query!(
+                "
+                UPDATE Product
+                SET units = ?
+                WHERE product_id = ?
+                ",
+                units,
+                item.product_id
+            )
+                .execute(&pool)
+                .await?;
+            }
+
+        sale.products.iter().for_each(|item| {
+            cost += item.cost * item.qty.parse::<f64>().unwrap_or(0.0);
+            let item_total = item.msrp * item.qty.parse::<f64>().unwrap_or(0.0);
+            total += item_total;
+            net += item_total - (item.cost * item.qty.parse::<f64>().unwrap_or(0.0));
+        });
+
+        if total < 500.00 {
+            shipping = 15.00;
+        }
+
+        if let Some(_) = sale.rep_id {
+            let rep_cut_t =
+                total * (sale.rep_percentage as f64 / 100.00);
+            let new_net = net - rep_cut_t;
+            net = new_net;
+            rep_cut = Some(rep_cut_t);
+        }
+
+        total += shipping;
+        cost += 9.00; // 9.00 cost to ship
+        net += shipping - 9.00; // 9.00 cost to ship
+                                
+        sqlx::query!(
+            "
+            UPDATE Sale
+            SET cost = ?, net = ?, total = ?, rep_cut = ?, shipping = ?
+            WHERE id = ?
+            ",
+            cost,
+            net,
+            total,
+            rep_cut,
+            shipping,
+            sale.id
+        )
+        .execute(&pool)
+        .await?;
+
+        Ok(())
+    }
 
     pub fn update(&mut self, message: SaleMessage) {
         match message {
@@ -648,7 +784,7 @@ impl SalesState {
                     self.edit_sale = false;
                 } else {
                     self.products_to_add.iter_mut().for_each(|item| {
-                        self.add_sales.cost += item.cost;
+                        self.add_sales.cost += item.cost * item.qty.parse::<f64>().unwrap_or(0.0);
                         let total = item.msrp * item.qty.parse::<f64>().unwrap_or(0.0);
                         self.add_sales.total += total;
                         self.add_sales.net += total - (item.cost * item.qty.parse::<f64>().unwrap_or(0.0));
@@ -766,6 +902,15 @@ impl SalesState {
             }
             SaleMessage::CloseEditSale => {
                 self.edit_sale = false;
+            }
+            SaleMessage::AddProduct => {
+                self.add_product_to_sale = true;
+            }
+            SaleMessage::CloseAddProduct => {
+                self.add_product_to_sale = false;
+            }
+            SaleMessage::SubmitAddProduct => {
+                self.add_sale = false;
             }
         }
     }
@@ -1029,6 +1174,7 @@ impl SalesState {
                         ))
                         .padding(12),
                 )
+                .push_maybe(self.add_product())
                 .push_maybe(self.edit_view())
                 .push_maybe(self.view_sale())
                 .push_maybe(self.create_view())
@@ -1362,6 +1508,41 @@ impl SalesState {
         }
     }
 
+    fn add_product(&self) -> Option<Element<AppMessage>> {
+        if self.add_product_to_sale {
+            Some(
+                Container::new(
+                    Column::new()
+                    .padding([8, 0, 8, 0])
+                    .width(Length::Fill)
+                    .align_items(Alignment::Center)
+                    .push(Row::new()
+                        .push(
+                        close_button(AppMessage::Sale(
+                                SaleMessage::CloseAddProduct,
+                        ))
+                        )
+                        .width(Length::Fill)
+                    )
+                    .push(
+                        Row::new()
+                        .spacing(12)
+                        .push(self.select_product())
+                        .push(self.selected_products()),
+                    )
+                    .push(Row::new()
+                        .push(Button::new(Text::new("Submit"))
+                            .on_press(AppMessage::Sale(SaleMessage::SubmitAddProduct))
+                        )
+                    )
+                    .spacing(8)
+                ).into()
+            )
+        } else {
+            None
+        }
+    }
+
     fn view_sale(&self) -> Option<Element<AppMessage>> {
         if self.view_sale {
             Some(
@@ -1412,6 +1593,7 @@ impl SalesState {
                                                         Column::new()
                                                         .push(
                                                             Button::new("Add")
+                                                            .on_press(AppMessage::Sale(SaleMessage::AddProduct))
                                                         )
                                                         .width(Length::Fill)
                                                         .align_items(Alignment::End)
