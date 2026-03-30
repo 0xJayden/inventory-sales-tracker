@@ -3,7 +3,7 @@ use std::env;
 
 use iced::{
     Alignment, Background, Border, Color, Element, Length, alignment::Horizontal, widget::{
-        Button, Column, Container, Row, Scrollable, Text, TextInput, container, scrollable::{Direction, Properties}
+        Button, Column, Container, Row, Scrollable, Text, TextInput, button, container, scrollable::{Direction, Properties}
     }
 };
 
@@ -13,7 +13,7 @@ use serde::{Deserialize};
 
 use crate::{
     AppMessage, clients::{Client, get_client, get_clients}, components::{
-        CustomButtonStyle, CustomContainerStyle, CustomMainButtonStyle, add_button, bold_text, card_style, close_button, close_edit_row, layout, table_column, table_header, table_row_style, table_style, text_input_column
+        CustomButtonStyle, CustomContainerStyle, CustomMainButtonStyle, add_button, bold_text, card_style, close_button, layout, table_column, table_header, table_row_style, table_style, text_input_column
     }, manufacture::select_header, product::{Product, get_products}, rep::{Rep, get_rep, get_reps}
 };
 
@@ -21,6 +21,7 @@ use crate::error::Errorr;
 
 #[derive(Default, Clone, Debug)]
 pub struct SaleProduct {
+    pub id: i64,
     pub name: String,
     pub qty: i64,
     pub units: i64,
@@ -105,12 +106,16 @@ pub struct SalesState {
     pub client_query: String,
     pub filtered_reps: Vec<Rep>,
     pub rep_query: String,
-    pub add_product_to_sale: bool
+    pub add_product_to_sale: bool,
+    pub open_product: bool,
+    pub product_to_edit: SaleProduct,
+    pub product_to_edit_qty: String
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum SaleMessage {
     ProductQtyChanged(String, i64, f64, f64),
+    EditProductQtyChanged(String),
     AddClient(i64, String, String, Option<String>),
     CreateClient,
     CreateClientSubmit,
@@ -144,6 +149,59 @@ pub enum SaleMessage {
     AddProduct,
     CloseAddProduct,
     SubmitAddProduct,
+    OpenProduct(i64),
+    CloseOpenProduct,
+    SubmitEditOpenProduct(i64, String)
+}
+
+pub async fn get_sales_and_sale(id: i64) -> Result<(Vec<Sale>, Sale, Vec<SaleProduct>), Errorr> {
+    let pool = SqlitePool::connect(&env::var("DATABASE_URL")?).await?;
+
+    let sales = sqlx::query_as!(Sale,
+                                "SELECT Sale.id, discount, total, Sale.cost, Sale.client_id, net, date, note, rep_id, shipping, status, rep_cut,
+                                Client.name as client_name,
+                                Client.address as client_address,
+                                Client.email as client_email,
+                                Rep.name as rep_name, Rep.percentage as `rep_percentage: u8`
+                                FROM Sale
+                                JOIN Client ON Sale.client_id = Client.client_id
+                                JOIN Rep ON Sale.rep_id = Rep.id
+                                ORDER BY created_at DESC
+                                "
+                               )
+        .fetch_all(&pool)
+        .await?;
+
+    let sale = sqlx::query_as!(Sale,
+                                "SELECT Sale.id, discount, total, Sale.cost, Sale.client_id, net, date, note, rep_id, shipping, status, rep_cut,
+                                Client.name as client_name,
+                                Client.address as client_address,
+                                Client.email as client_email,
+                                Rep.name as rep_name, Rep.percentage as `rep_percentage: u8`
+                                FROM Sale
+                                JOIN Client ON Sale.client_id = Client.client_id
+                                JOIN Rep ON Sale.rep_id = Rep.id
+                                WHERE Sale.id = ?
+                                ORDER BY created_at DESC
+                                ",
+                                id
+                               )
+        .fetch_one(&pool)
+        .await?;
+
+    let sale_products = sqlx::query_as!(SaleProduct,
+                               "
+                               SELECT SaleProduct.id, SaleProduct.cost_at_sale, SaleProduct.msrp_at_sale, SaleProduct.qty,
+                               Product.name, Product.units, Product.cost, Product.msrp
+                               FROM SaleProduct
+                               JOIN Product ON SaleProduct.product_id = Product.product_id
+                               WHERE SaleProduct.sale_id = ?
+                               ",
+                               id)
+        .fetch_all(&pool)
+        .await?;
+
+    Ok((sales, sale, sale_products))
 }
 
 pub async fn get_sales() -> Result<Vec<Sale>, Errorr> {
@@ -174,12 +232,30 @@ pub struct SC {
     pub rep: Option<Rep>
 }
 
+pub async fn get_sale_product(id: i64) -> Result<SaleProduct, Errorr> {
+    let pool = SqlitePool::connect(&env::var("DATABASE_URL")?).await?;
+
+    let sale_product = sqlx::query_as!(SaleProduct,
+                               "
+                               SELECT SaleProduct.id, SaleProduct.cost_at_sale, SaleProduct.msrp_at_sale, SaleProduct.qty,
+                               Product.name, Product.units, Product.cost, Product.msrp
+                               FROM SaleProduct
+                               JOIN Product ON SaleProduct.product_id = Product.product_id
+                               WHERE SaleProduct.id = ?
+                               ",
+                               id)
+        .fetch_one(&pool)
+        .await?;
+
+    Ok(sale_product)
+}
+
 pub async fn get_sale_products_and_client(id: i64, client_id: i64, rep_id: Option<i64>) -> Result<SC, Errorr> {
     let pool = SqlitePool::connect(&env::var("DATABASE_URL")?).await?;
 
     let sale_products = sqlx::query_as!(SaleProduct,
                                "
-                               SELECT SaleProduct.cost_at_sale, SaleProduct.msrp_at_sale, SaleProduct.qty,
+                               SELECT SaleProduct.id, SaleProduct.cost_at_sale, SaleProduct.msrp_at_sale, SaleProduct.qty,
                                Product.name, Product.units, Product.cost, Product.msrp
                                FROM SaleProduct
                                JOIN Product ON SaleProduct.product_id = Product.product_id
@@ -286,33 +362,12 @@ pub async fn add_rep_set(rep: Rep) -> Result<R, Errorr> {
     Ok(r)
 }
 
-fn item_view_row(label: &str, value: String) -> Row<'static, AppMessage> {
-    Row::new()
-        .padding(4)
-        .push(Row::new().push(Text::new(label.to_string())).width(100))
-        .push(
-            Column::new()
-                .push(Text::new(value))
-                .align_items(Alignment::End)
-                .width(100),
-        )
-}
-
-fn item_view(item: &SaleProduct) -> Container<'static, AppMessage> {
-    let total = item.msrp * item.qty as f64;
-    let net = total - item.cost * item.qty as f64;
-
-    Container::new(
-        Column::new()
-            .push(Text::new(item.name.to_string()).size(20))
-            .push(item_view_row("Quantity: ", item.qty.to_string()))
-            .push(item_view_row("Cost: ", format!("${:.2}", item.cost)))
-            .push(item_view_row("MSRP: ", format!("${:.2}", item.msrp)))
-            .push(item_view_row("Net: ", format!("${:.2}", net)))
-            .push(item_view_row("Total: ", format!("${:.2}", total))),
-    )
-    .padding(8)
-    .style(card_style())
+fn item_view(item: &SaleProduct) -> Element<'static, AppMessage> {
+    Button::new(Text::new(format!("{} {}", item.qty, item.name)).size(20))
+        .on_press(AppMessage::Sale(SaleMessage::OpenProduct(item.id)))
+        .style(CustomButtonStyle) 
+        .padding(8)
+        .into()
 }
 
 fn client_view_row(value: String) -> Row<'static, AppMessage> {
@@ -415,6 +470,90 @@ impl SalesState {
         .await?;
 
         Ok(())
+    }
+
+    pub async fn edit_sale_product(id: i64, qty: String) -> Result<i64, Errorr> {
+        let pool = SqlitePool::connect(&env::var("DATABASE_URL")?).await?;
+
+        let qty = qty.parse::<i64>().unwrap_or(0);
+
+        let x = sqlx::query!(
+            "
+            UPDATE SaleProduct
+            SET qty = ?
+            WHERE id = ?
+            RETURNING sale_id
+            ",
+            qty,
+            id
+        )
+        .fetch_one(&pool)
+        .await?;
+
+        let sale = sqlx::query_as!(SaleToAddProduct,
+            r#"
+            SELECT Sale.id, discount, total, Sale.cost, net, date, rep_id, shipping, status, rep_cut,
+            Rep.name as rep_name, Rep.percentage as `rep_percentage: u8`,
+            json_group_array(
+                json_object('product_id', SaleProduct.product_id, 'name', name, 'units', 0, 'qty', CAST(SaleProduct.qty AS TEXT), 'msrp', SaleProduct.msrp_at_sale, 'cost', SaleProduct.cost_at_sale)
+            ) as "products: Json<Vec<SaleProductToAdd>>"
+            FROM Sale
+            JOIN Rep ON Sale.rep_id = Rep.id
+            JOIN SaleProduct ON Sale.id = SaleProduct.sale_id
+            WHERE Sale.id = ?
+            GROUP BY Sale.id
+            "#,
+            x.sale_id
+        )
+            .fetch_one(&pool)
+            .await?;
+
+        let mut cost = 0.00;
+        let mut total = 0.00;
+        let mut shipping = 0.00;
+        let mut net = 0.00;
+        let mut rep_cut: Option<f64> = None;
+
+        sale.products.iter().for_each(|item| {
+            cost += item.cost * item.qty.parse::<f64>().unwrap_or(0.0);
+            let item_total = item.msrp * item.qty.parse::<f64>().unwrap_or(0.0);
+            total += item_total;
+            net += item_total - (item.cost * item.qty.parse::<f64>().unwrap_or(0.0));
+        });
+
+        if total < 500.00 {
+            shipping = 15.00;
+        }
+
+        if let Some(_) = sale.rep_id {
+            let rep_cut_t =
+                total * (sale.rep_percentage as f64 / 100.00);
+            let new_net = net - rep_cut_t;
+            net = new_net;
+            rep_cut = Some(rep_cut_t);
+        }
+
+        total += shipping;
+        cost += 9.00; // 9.00 cost to ship
+        net += shipping - 9.00; // 9.00 cost to ship
+
+        sqlx::query!(
+            "
+            UPDATE Sale
+            SET cost = ?, net = ?, total = ?, rep_cut = ?, shipping = ?
+            WHERE id = ?
+            ",
+            cost,
+            net,
+            total,
+            rep_cut,
+            shipping,
+            sale.id
+        )
+        .execute(&pool)
+        .await?;
+
+        Ok(sale.id)
     }
 
     pub async fn fulfill_sale(id: i64) -> Result<(), Errorr> {
@@ -682,6 +821,14 @@ impl SalesState {
                     }
                 }
             }
+            SaleMessage::EditProductQtyChanged(qty) => {
+                let q = qty.parse::<i64>().unwrap_or(0).to_string();
+                if q == "0".to_string() {
+                    self.product_to_edit_qty = "".to_string()
+                } else {
+                    self.product_to_edit_qty = q
+                }
+            }
             SaleMessage::DiscountInput(d, is_edit) => {
                 if is_edit {
                     self.sale_to_edit.discount = Some(d.parse::<f64>().unwrap_or(0.00))
@@ -912,6 +1059,71 @@ impl SalesState {
             SaleMessage::SubmitAddProduct => {
                 self.add_sale = false;
             }
+            SaleMessage::OpenProduct(id) => {
+                self.open_product = true;
+            }
+            SaleMessage::CloseOpenProduct => {
+                self.open_product = false;
+            }
+            SaleMessage::SubmitEditOpenProduct(id, qty) => {
+                self.open_product = false;
+            }
+        }
+    }
+
+    fn open_product(&self) -> Option<Element<AppMessage>> {
+        if self.open_product {
+            Some(
+                Container::new(
+                    Column::new()
+                    .spacing(8)
+                        .push(
+                            Column::new()
+                            .push(
+                                close_button(AppMessage::Sale(SaleMessage::CloseOpenProduct))
+                            )
+                        )
+                    .push(Text::new(&self.product_to_edit.name).size(24))
+                    .push(
+                        Row::new()
+                        .spacing(8)
+                        .push(Text::new("Quantity"))
+                        .push(
+                        TextInput::new("Quantity", &self.product_to_edit_qty.to_string())
+                        .width(50)
+                        .on_input(|input| {
+                            AppMessage::Sale(
+                                SaleMessage::EditProductQtyChanged(
+                                    input,
+                                ),
+                            )
+                        }),
+                        )
+                    )
+                    .push(
+                        Row::new()
+                        .spacing(16)
+                        .push(
+                            Column::new()
+                            .push(
+                                Button::new(Text::new("Submit"))
+                                .on_press(AppMessage::Sale(SaleMessage::SubmitEditOpenProduct(self.product_to_edit.id, self.product_to_edit_qty.clone())))
+                            )
+                        )
+                        .push(
+                            Column::new()
+                            .push(
+                                Button::new(Text::new("Delete"))
+                            )
+                        )
+                    )
+                )
+                .padding(16)
+                .style(CustomContainerStyle)
+                .into()
+            )
+        } else {
+            None
         }
     }
 
@@ -1174,6 +1386,7 @@ impl SalesState {
                         ))
                         .padding(12),
                 )
+                .push_maybe(self.open_product())
                 .push_maybe(self.add_product())
                 .push_maybe(self.edit_view())
                 .push_maybe(self.view_sale())
@@ -1543,52 +1756,99 @@ impl SalesState {
         }
     }
 
+    fn info_view(&self) -> Element<AppMessage> {
+        Container::new(
+            Column::new()
+            .push(
+                Row::new()
+                .push(
+                    Column::new()
+                    .push(
+                        Text::new("Info").size(24)
+                    )
+                    .width(Length::Fill)
+                )
+                .push(
+                    Column::new()
+                    .push(
+                        Button::new(Text::new("Edit"))
+                        .on_press(AppMessage::EditSale(self.sale_to_view.clone()))
+                    )
+                    .width(Length::Fill)
+                    .align_items(Alignment::End)
+                )
+            )
+            .push(
+                Row::new()
+                .spacing(8)
+                .push(
+                    Row::new()
+                    .push(Text::new("Status: "))
+                    .push(Text::new(&self.sale_to_view.status)),
+                )
+                .push(
+                    Column::new().push(
+                        Button::new("Complete")
+                        .on_press(AppMessage::Sale(SaleMessage::Fulfill))
+                        .style(CustomMainButtonStyle),
+                    ),
+                ),
+            )
+            .push(
+                Row::new()
+                .push(Text::new("Date: "))
+                .push(Text::new(&self.sale_to_view.date))
+            )
+            .push(
+                Row::new()
+                .push(Text::new("Total: "))
+                .push(Text::new(format!("${:.2}", self.sale_to_view.total)))
+            )
+            .push(
+                Row::new()
+                .push(Text::new("Cost: "))
+                .push(Text::new(format!("${:.2}", self.sale_to_view.cost)))
+            )
+            .push(
+                Row::new()
+                .push(Text::new("Net: "))
+                .push(Text::new(format!("${:.2}", self.sale_to_view.net)))
+            )
+            .push(
+                Row::new()
+                .push(Text::new("Note: "))
+                .push(Text::new(self.sale_to_view.note.clone().unwrap_or("".to_string())))
+            )
+            .spacing(8)
+            )
+            .style(CustomContainerStyle)
+            .width(Length::Fill)
+            .padding(16)
+            .into()
+    }
+
     fn view_sale(&self) -> Option<Element<AppMessage>> {
         if self.view_sale {
             Some(
                 Container::new(
                     Column::new()
-                        .push(
-                            close_edit_row(
-                                AppMessage::Sale(SaleMessage::CloseSale),
-                                AppMessage::EditSale(self.sale_to_view.clone())
-                                )
-                            )
-                        .push(
-                            Row::new()
-                                .spacing(12)
-                                .padding([8, 0])
-                                .push(
-                                    Column::new().push(
-                                        Row::new()
-                                            .push(Text::new("Status: "))
-                                            .push(Text::new(&self.sale_to_view.status)),
-                                    ),
-                                )
-                                .push(
-                                    Column::new().push(
-                                        Button::new("Complete")
-                                            .on_press(AppMessage::Sale(SaleMessage::Fulfill))
-                                            .style(CustomMainButtonStyle),
-                                    ),
-                                ),
-                        )
-                                        .push(
-                                            Row::new()
-                                            .push(Text::new("Date: "))
-                                            .push(Text::new(&self.sale_to_view.date))
-                                            )
+                    .push(close_button(AppMessage::Sale(
+                                SaleMessage::CloseSale,
+                    )))
                         .push(
                             Container::new(
                             Row::new()
                                 .push(
                                     Column::new()
+                                    .spacing(16)
+                                        .push(self.info_view())
                                         .push(Container::new(
                                                 Column::new()
                                                 .push(Row::new()
                                                     .push(
                                                         Text::new("Products").size(24)
                                                         )
+                                                    .spacing(8)
                                                     .push(
                                                         Column::new()
                                                         .push(
@@ -1603,10 +1863,11 @@ impl SalesState {
                                                             self.sale_products_to_view.iter().map(|item| {
                                                                 Row::new()
                                                                     .push(item_view(&item))
-                                                                    .padding([8, 0, 8, 0])
                                                                     .into()
                                                             }),
-                                                )))
+                                                )
+                                                        .spacing(8)
+                                                        ))
                                                 .padding([0, 12, 0, 0])
                                                 .width(Length::Fill)
                                         )

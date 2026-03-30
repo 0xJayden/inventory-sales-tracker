@@ -24,6 +24,8 @@ use sales::{
     Sale, SaleMessage, SaleProductToAdd, SalesState, PCR, R, SC,
 };
 
+use crate::sales::{SaleProduct, get_sale_product, get_sales_and_sale};
+
 mod clients;
 mod components;
 mod error;
@@ -85,6 +87,7 @@ pub enum AppMessage {
     DoIt(Result<(), Errorr>),
     SaveSales(Result<Vec<Sale>, Errorr>),
     SaveSalesAndSale(Result<Vec<Sale>, Errorr>),
+    SaveSalesAndSaleAfterEdit(Result<(Vec<Sale>, Sale, Vec<SaleProduct>), Errorr>),
     SaveProducts(Result<Vec<Product>, Errorr>),
     SaveProductsToSales(Result<Vec<Product>, Errorr>),
     SetClientId(Result<i64, Errorr>),
@@ -92,6 +95,8 @@ pub enum AppMessage {
     GoToHome,
     Home(HomeMessage),
     SaveHome(Result<SPS, Errorr>),
+    SaveOpenProduct(Result<SaleProduct, Errorr>),
+    AfterEditOpenProduct(Result<i64, Errorr>)
 }
 
 #[derive(Default, Clone)]
@@ -255,6 +260,14 @@ impl Application for App {
                     SaleMessage::Fulfill => Command::perform(
                         SalesState::fulfill_sale(self.sales.sale_to_view.id),
                         AppMessage::RefetchSalesAndSale,
+                    ),
+                    SaleMessage::OpenProduct(id) => Command::perform(
+                        get_sale_product(id),
+                        AppMessage::SaveOpenProduct,
+                    ),
+                    SaleMessage::SubmitEditOpenProduct(id, qty) => Command::perform(
+                       SalesState::edit_sale_product(id, qty),
+                       AppMessage::AfterEditOpenProduct
                     ),
                     _ => Command::none(),
                 }
@@ -545,6 +558,19 @@ impl Application for App {
                 }
                 Command::none()
             }
+            AppMessage::SaveSalesAndSaleAfterEdit(r) => {
+                match r {
+                    Ok(s) => {
+                        self.sales.sales = s.0;
+                        self.sales.sale_to_view = s.1;
+                        self.sales.sale_products_to_view = s.2;
+                    }
+                    Err(_) => {
+                        println!("error");
+                    }
+                }
+                Command::none()
+            }
             AppMessage::SaveSalesAndSale(r) => {
                 match r {
                     Ok(s) => {
@@ -800,6 +826,13 @@ impl Application for App {
                     Command::none()
                 }
             },
+            AppMessage::AfterEditOpenProduct(r) => match r {
+                Ok(id) => Command::perform(get_sales_and_sale(id), AppMessage::SaveSalesAndSaleAfterEdit),
+                Err(_) => {
+                    println!("error");
+                    Command::none()
+                }
+            },
             AppMessage::RefetchReps(r) => match r {
                 Ok(_) => Command::perform(get_reps(), AppMessage::SaveReps),
                 Err(_) => {
@@ -865,6 +898,18 @@ impl Application for App {
 
                         self.sales.products_to_select = x.clone();
                         self.sales.filtered_products = x;
+                    }
+                    Err(_) => {
+                        println!("error");
+                    }
+                }
+                Command::none()
+            }
+            AppMessage::SaveOpenProduct(product) => {
+                match product {
+                    Ok(p) => {
+                        self.sales.product_to_edit_qty = p.qty.clone().to_string();
+                        self.sales.product_to_edit = p;
                     }
                     Err(_) => {
                         println!("error");
